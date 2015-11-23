@@ -1,0 +1,9 @@
+/*
+/*/
+!/omni/
+!/calcs/
+!/calcs/codes/
+!/calcs/codes/.info
+!makefile
+!.gitignore
+*.pyc

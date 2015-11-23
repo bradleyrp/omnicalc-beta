@@ -1,0 +1,3 @@
+# note that this is a placeholder file so calcs/codes appears in the git repository
+# place calculation and plotting functions in calcs so the makefile can find them
+# place additional dependencies in the codes folder
