@@ -22,6 +22,22 @@ paths = {
 	}
 """
 
+default_parser = """
+parse_specs = {
+	'shortname':'simulation-v([0-9]+)',
+	'toc':[
+		'(simulation-v[0-9]+)',
+		'([stuv])([0-9]+)-([^\/]+)',
+		'md.part([0-9]{4})\.xtc',
+		],
+	'toc_structures':[
+		'(simulation-v[0-9]+)',
+		'([a-z])([0-9]+)-([^\/]+)',
+		'(system|system-input|structure)\.(gro|pdb)'
+		],
+	}
+"""
+
 def set_post_directory(dn):
 
 	"""
@@ -72,7 +88,7 @@ config_help = {
 	'POST':{'name':'postprocessing directory','default':'./post',
 	'help':'location for postprocessed data (directory must not exist)',
 	'valid':set_post_directory},
-	'PLOT':{'name':'plot directory','default':'./post/plot',
+	'PLOT':{'name':'plot directory','default':'./plot',
 	'help':'location for writing figures (directory must not exist)',
 	'valid':set_post_directory},
 	'WORK':{'name':'workspace file location','default':'./workspace',
@@ -82,6 +98,8 @@ config_help = {
 	'help':'location for setting specifications',
 	'valid':check_specs_file},
 	}
+
+#---default parser specifications
 	
 def bootstrap_gromacs():
 
@@ -122,7 +140,10 @@ def bootstrap_paths():
 		if not config_help[key]['valid'](ans): raise Exception('[ERROR] invalid response')
 		else: paths_script = re.sub(key,"'%s'"%ans,paths_script)
 	#---end user intervention
-	with open(fn,'w') as fp: fp.write(paths_script)
+	with open(fn,'w') as fp: 
+		fp.write(paths_script)
+		fp.write(default_parser)
 	print "[STATUS] default configuration file:\n|"
 	for line in paths_script.split('\n'): print '|  '+re.sub('\t','  ',line)
 	print '[STATUS] edit this file at %s'%fn	
+	print "[NOTE] modify the parse_specs variable in %s to search the dataset"%fn
