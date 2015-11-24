@@ -46,7 +46,7 @@ def look(workspace=None):
 	Take a look around (you). Drops you into an interactive shell with the header.
 	"""
 
-	os.system('python -i ./ate/base/header.py')
+	os.system('python -i ./omni/base/header.py')
 	
 def plot(plotname):
 
