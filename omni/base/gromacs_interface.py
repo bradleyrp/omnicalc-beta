@@ -4,7 +4,7 @@ from gromacs import *
 import os,subprocess,re
 from tools import call,status
 
-def edrcheck(fn):
+def edrcheck(fn,debug=False):
 
 	"""
 	Find the corresponding EDR file for a trajectory and return its energy time stamps.
@@ -14,8 +14,7 @@ def edrcheck(fn):
 	edr_fn = fn[:-3]+'edr'
 	if os.path.isfile(edr_fn):
 		cmd = gmxpaths['gmxcheck']+' -e %s'%edr_fn
-		p = subprocess.Popen(cmd,stdout=subprocess.PIPE,
-			stdin=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
+		p = subprocess.Popen(cmd,stdout=subprocess.PIPE,stdin=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
 		catch = p.communicate(input=None)
 		log = re.sub('\\\r','\n','\n'.join(catch)).split('\n')
 		start,end = None,None
@@ -24,8 +23,11 @@ def edrcheck(fn):
 				filter(lambda z:re.match('\s*(R|r)eading energy frame',z),log))[0]
 			end = map(lambda y:re.findall('^.+time\s*([0-9]+\.?[0-9]+)',y)[0],
 				filter(lambda z:re.match('\s*(L|l)ast energy',z),log))[0]
-			start,end = float(start) if start!=None else start,float(end)
 		except: pass
+		start = float(start) if start!=None else start
+		end = float(end) if end!=None else end
+	if debug: 
+		import pdb;pdb.set_trace()
 	return start,end
 
 def slice_trajectory(start,end,skip,seq_time_fn,outkey='TMP',
