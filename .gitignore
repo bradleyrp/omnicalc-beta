@@ -7,3 +7,4 @@
 !makefile
 !.gitignore
 *.pyc
+!README.md
