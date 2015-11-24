@@ -9,6 +9,8 @@ if 'os' not in globals():
 	if 'PYTHONSTARTUP' in os.environ:
 		execfile(os.environ['PYTHONSTARTUP'])
 	import os
+#---group writeable files
+os.umask(002)
 #---only run this script from the top directory
 if not os.path.isdir('omni'): raise Exception('[ERROR] you can only use the header from the top level')
 import re,pickle,subprocess
