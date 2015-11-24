@@ -10,11 +10,11 @@ if 'os' not in globals():
 		execfile(os.environ['PYTHONSTARTUP'])
 	import os
 #---only run this script from the top directory
-if not os.path.isdir('ate'): raise Exception('[ERROR] you can only use the header from the top level')
+if not os.path.isdir('omni'): raise Exception('[ERROR] you can only use the header from the top level')
 import re,pickle,subprocess
 import yaml
 #---scripts are run via make so we have to add to the path to find dependencies
-sys.path.insert(0,'./ate/')
+sys.path.insert(0,'./omni/')
 from base.constants import conf_paths,conf_gromacs
 from base.config import bootstrap_gromacs,bootstrap_paths
 from base.workspace import Workspace
