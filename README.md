@@ -1,4 +1,4 @@
-<img src="https://github.com/bradleyrp/omnicalc/raw/master/omni/docs/omnicalc.png"/>
+<img src="https://github.com/bradleyrp/omnicalc/raw/master/omni/docs/omnicalc.png" width="48"/>
 
 OMNICALC  /// OMNI
 ==================
