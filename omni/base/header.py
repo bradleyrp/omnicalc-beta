@@ -15,6 +15,10 @@ import re,pickle,subprocess
 import yaml
 #---scripts are run via make so we have to add to the path to find dependencies
 sys.path.insert(0,'./omni/')
+#---if nox (no X windows) is in the arguments then we use the Agg backend
+if 'nox' in sys.argv:
+	import matplotlib
+	matplotlib.use('Agg')
 from base.constants import conf_paths,conf_gromacs
 from base.config import bootstrap_gromacs,bootstrap_paths
 from base.workspace import Workspace
@@ -39,4 +43,3 @@ def workspace(func):
 		kwargs['workspace'] = work
 		return func(*args,**kwargs)
 	return mod
-

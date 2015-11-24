@@ -41,13 +41,13 @@ def compute(specfile=None,workspace=None,autoreload=False,dry=False):
 	work.action(specfile,dry=dry)
 	work.save()
 
-def look(workspace=None):
+def look(workspace=None,nox=False):
 
 	"""
 	Take a look around (you). Drops you into an interactive shell with the header.
 	"""
 
-	os.system('python -i ./omni/base/header.py')
+	os.system('python -i ./omni/base/header.py'+(' nox' if nox else ''))
 	
 def plot(plotname):
 
@@ -64,7 +64,7 @@ def plot(plotname):
 		status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
 		os.system('./'+search[0])
 
-def tests(specfile=None):
+def tests(specfile=None,nox=False):
 
 	"""
 	Run the test suite. 
@@ -76,7 +76,7 @@ def tests(specfile=None):
 	with open(specfile,'r') as fp: test_plot_names = yaml.load(fp.read())['test_plots']
 	for name in test_plot_names:
 		print '[TEST SUITE] plotting %s'%name
-		os.system('python calcs/plot-%s.py'%name)
+		subprocess.check_call(['python','calcs/plot-%s.py'%name,'nox' if nox else ''])
 
 #---INTERFACE
 #-------------------------------------------------------------------------------------------------------------
