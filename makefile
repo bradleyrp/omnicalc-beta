@@ -12,7 +12,7 @@ banner:
 -include banner
 	
 #---valid function names from the python script
-TARGETS := $(shell perl -n -e '@parts = /^def\s+[a-z,_]+/g; $$\ = "\n"; print for @parts;' omni/controller.py scripts/*.py | awk '{print $$2}')
+TARGETS := $(shell perl -n -e '@parts = /^def\s+[a-z,_]+/g; $$\ = "\n"; print for @parts;' omni/controller.py calcs/scripts/*.py | awk '{print $$2}')
 
 #---collect arguments
 RUN_ARGS_UNFILTER := $(wordlist 1,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
