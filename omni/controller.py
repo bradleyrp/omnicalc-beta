@@ -28,7 +28,7 @@ from base.computer import computer
 #---FUNCTIONS
 #-------------------------------------------------------------------------------------------------------------
 
-def compute(specfile=None,workspace=None,autoreload=False,dry=False):
+def compute(calculation_name=None,specfile=None,workspace=None,autoreload=False,dry=False):
 
 	"""
 	Open the workspace, parse a YAML script with instructions, save, and exit.
@@ -38,7 +38,7 @@ def compute(specfile=None,workspace=None,autoreload=False,dry=False):
 	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
 	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
 	work = Workspace(workspace,previous=False,autoreload=autoreload)
-	work.action(specfile,dry=dry)
+	work.action(calculation_name=calculation_name,spec_fn=specfile,dry=dry)
 	work.save()
 
 def look(workspace=None,nox=False):

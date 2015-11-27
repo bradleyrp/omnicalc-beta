@@ -38,9 +38,12 @@ def computer(function,**kwargs):
 		else:
 			#---if the incoming type is a dictionary we use it to look up an upstream calculation
 			if incoming_type == 'post': 
+				#---for each upstream spec we locate the associated postprocessing data file
 				for key,val in calc['specs']['upstream'].items():
-					upspecs = deepcopy(work.calc['lipid_abstractor'])
+					upspecs = deepcopy(work.calc[key])
+					#---identify the list of particular options along with the 
 					options,stubs = work.interpret_specs(upspecs,return_stubs=True)
+					#---identify paths and values over which we "whittle" the total list of specs
 					whittles = [(i,j) for i,j in catalog(val)]
 					#---select the correct option by matching all catalogued routes from the incoming
 					#---...key to the original calculation
@@ -48,10 +51,23 @@ def computer(function,**kwargs):
 						if delve(s['specs'],*r)==v]
 					if len(select)!=1: raise Exception('[ERROR] redundant upstream selection %s'%str(select))
 					else: specs = select[0]
-					#---load the upstream data
-					fn_base = work.slices[sn][upspecs['slice_name']][upspecs['group']]['filekey']+'.%s'%key
+					#---if the upstream calculation has a group then use it in the filename
+					if not group:
+						if 'group' in work.calc[key]: upgroup = work.calc[key]['group']
+						else: upgroup = None
+					else: upgroup = group
+					if not upgroup: 
+						sl = work.slices[sn][slice_name]
+						fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',
+							work.slices[sn][upspecs['slice_name']]['all']['filekey']
+							)[0]+'.%s'%key
+					else: 
+						sl = work.slices[sn][slice_name][upgroup]
+						fn_base = '%s.%s'%(sl['filekey'],key)
 					fn = work.select_postdata(fn_base,specs)
-					data[sn][key] = load(os.path.basename(fn)[:-4]+'dat',work.postdir)
+					if not fn: raise Exception('[ERROR] missing %s'%fn)
+					#---before each calculation the master loop loads the filename stored here
+					data[sn][key] = os.path.basename(fn)[:-4]+'dat'
 			else: raise Exception("[ERROR] 'data type in' %s not implemented yet"%incoming_type)
 			jobs.append({'sn':sn,'slice_name':slice_name,'group':group,'upstream':data[sn].keys()})
 
@@ -88,7 +104,8 @@ def computer(function,**kwargs):
 				outgoing['calc'] = calc
 				if 'upstream' in outgoing:
 					sn = outgoing['sn']
-					outgoing['upstream'] = dict([(k,data[sn][k]) for k in outgoing['upstream']])
+					outgoing['upstream'] = dict([(k,
+						load(data[sn][k],work.postdir)) for k in outgoing['upstream']])
 				result,attrs = function(**outgoing)
 				"""
 				spec files are carefully constructed
@@ -106,11 +123,16 @@ def computer(function,**kwargs):
 				#---if any calculation specifications are not in attributes we warn the user here
 				if 'specs' in calc: unaccounted = [i for i in calc['specs'] if i not in attrs]
 				else: unaccounted = []
-				if any(unaccounted): status('some calculation specs were not saved: %s'%
-					str(unaccounted),tag='warning')				
 				if 'upstream' in unaccounted and 'upstream' not in attrs: 
 					status('automatically appending upstream data',tag='status')
+					unaccounted.pop('upstream')
 					attrs['upstream'] = calc['specs']['upstream']
+				if any(unaccounted):
+					status('some calculation specs were not saved: %s'%
+						str(unaccounted),tag='warning')
+					raise Exception('\n[ERROR] a calculation spec was not added to the attributes and '+
+						'hence these data will not be found by plotloader later on. '+
+						'Add the specs to attrs in your calculation function to continue.')
 				store(result,fn,work.postdir,attrs=attrs)
 				with open(work.postdir+fn_base+fn_key+'.spec','w') as fp: fp.write(json.dumps(attrs)+'\n')
 				#---previously stored lookup logic but this is contained in calcspecs and can be inferred

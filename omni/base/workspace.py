@@ -375,6 +375,11 @@ class Workspace():
 		for specfn in glob.glob(self.postdir+fn_base+'*.spec'):
 			with open(specfn,'r') as fp: attrs = json.loads(fp.read())
 			if attrs=={} or attrs==calc['specs']: return specfn
+			#---if specs are not identical we compare the ones that are and pass if they are equal
+			chop = deepcopy(attrs)
+			extra_keys = [key for key in chop if key not in calc['specs']]
+			for key in extra_keys: del chop[key]
+			if calc['specs']==chop: return specfn
 		return None
 
 	def collection(self,*args):
@@ -524,12 +529,13 @@ class Workspace():
 			
 	#---READ SPECIFICATIONS FILES
 
-	def action(self,spec_fn='specs.yaml',dry=False):
+	def action(self,calculation_name=None,spec_fn='specs.yaml',dry=False):
 	
 		"""
 		Parse a specifications file to make changes to a workspace.
 		"""
 
+		status('parsing specs file',tag='status')
 		#---load the yaml specifications file
 		with open(spec_fn,'r') as fp: raw_specs = fp.read()
 		specs = yaml.load(raw_specs)
@@ -601,6 +607,8 @@ class Workspace():
 			#---calculations which require simulations are performed first
 			calckeys = [key for key,val in specs['calculations'].items() if val['uptype']=='simulation']
 			calckeys += [key for key,val in specs['calculations'].items() if val['uptype']!='simulation']
+			#---if a specific calculation name is given then only perform that calculation
+			if not calculation_name is None: calckeys = [calculation_name]
 			for calcname in calckeys:
 				details = specs['calculations'][calcname]
 				new_calcs = self.interpret_specs(details)

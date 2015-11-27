@@ -31,8 +31,8 @@ checkfile=.pipeline_up_to_date
 $(checkfile): $(scripts)
 ifeq (,$(findstring push,${RUN_ARGS}))
 	touch $(checkfile)
-	@echo -n "[STATUS] "
-	python omni/controller.py ${RUN_ARGS} ${MAKEFLAGS} && echo "[STATUS] bye" || { echo "[STATUS] fail"; }
+	@echo "[STATUS] calling: python omni/controller.py ${RUN_ARGS} ${MAKEFLAGS}"
+	@python omni/controller.py ${RUN_ARGS} ${MAKEFLAGS} && echo "[STATUS] bye" || { echo "[STATUS] fail"; }
 endif
 
 #---default and arbitrary make targets
