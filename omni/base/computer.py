@@ -30,46 +30,44 @@ def computer(function,**kwargs):
 	incoming_type = calc['uptype']
 	jobs,data = [],dict([(sn,{}) for sn in sns])
 	for sn in sns:
+		new_job = {'sn':sn,'slice_name':slice_name,'group':group}
 		if incoming_type == 'simulation':
 			#---prepare combinations in a dictionary
-			jobs.append({'sn':sn,'slice_name':slice_name,'group':group,
-				'grofile':work.postdir+work.slices[sn][slice_name][group]['gro'],
-				'trajfile':work.postdir+work.slices[sn][slice_name][group]['xtc'],})
-		else:
-			#---if the incoming type is a dictionary we use it to look up an upstream calculation
-			if incoming_type == 'post': 
-				#---for each upstream spec we locate the associated postprocessing data file
-				for key,val in calc['specs']['upstream'].items():
-					upspecs = deepcopy(work.calc[key])
-					#---identify the list of particular options along with the 
-					options,stubs = work.interpret_specs(upspecs,return_stubs=True)
-					#---identify paths and values over which we "whittle" the total list of specs
-					whittles = [(i,j) for i,j in catalog(val)]
-					#---select the correct option by matching all catalogued routes from the incoming
-					#---...key to the original calculation
-					select = [options[ss] for r,v in whittles for ss,s in enumerate(stubs) 
-						if delve(s['specs'],*r)==v]
-					if len(select)!=1: raise Exception('[ERROR] redundant upstream selection %s'%str(select))
-					else: specs = select[0]
-					#---if the upstream calculation has a group then use it in the filename
-					if not group:
-						if 'group' in work.calc[key]: upgroup = work.calc[key]['group']
-						else: upgroup = None
-					else: upgroup = group
-					if not upgroup: 
-						sl = work.slices[sn][slice_name]
-						fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',
-							work.slices[sn][upspecs['slice_name']]['all']['filekey']
-							)[0]+'.%s'%key
-					else: 
-						sl = work.slices[sn][slice_name][upgroup]
-						fn_base = '%s.%s'%(sl['filekey'],key)
-					fn = work.select_postdata(fn_base,specs)
-					if not fn: raise Exception('[ERROR] missing %s'%fn)
-					#---before each calculation the master loop loads the filename stored here
-					data[sn][key] = os.path.basename(fn)[:-4]+'dat'
-			else: raise Exception("[ERROR] 'data type in' %s not implemented yet"%incoming_type)
-			jobs.append({'sn':sn,'slice_name':slice_name,'group':group,'upstream':data[sn].keys()})
+			new_job['grofile'] = work.postdir+work.slices[sn][slice_name][group]['gro']
+			new_job['trajfile'] = work.postdir+work.slices[sn][slice_name][group]['xtc']
+		if 'upstream' in calc['specs']:
+			#---for each upstream spec we locate the associated postprocessing data file
+			for key,val in calc['specs']['upstream'].items():
+				upspecs = deepcopy(work.calc[key])
+				#---identify the list of particular options along with the 
+				options,stubs = work.interpret_specs(upspecs,return_stubs=True)
+				#---identify paths and values over which we "whittle" the total list of specs
+				whittles = [(i,j) for i,j in catalog(val)]
+				#---select the correct option by matching all catalogued routes from the incoming
+				#---...key to the original calculation
+				select = [options[ss] for r,v in whittles for ss,s in enumerate(stubs) 
+					if delve(s['specs'],*r)==v]
+				if len(select)!=1: raise Exception('[ERROR] redundant upstream selection %s'%str(select))
+				else: specs = select[0]
+				#---if the upstream calculation has a group then use it in the filename
+				if not group:
+					if 'group' in work.calc[key]: upgroup = work.calc[key]['group']
+					else: upgroup = None
+				else: upgroup = group
+				if not upgroup: 
+					sl = work.slices[sn][slice_name]
+					fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',
+						work.slices[sn][upspecs['slice_name']]['all']['filekey']
+						)[0]+'.%s'%key
+				else: 
+					sl = work.slices[sn][slice_name][upgroup]
+					fn_base = '%s.%s'%(sl['filekey'],key)
+				fn = work.select_postdata(fn_base,specs)
+				if not fn: raise Exception('[ERROR] missing %s'%fn)
+				#---before each calculation the master loop loads the filename stored here
+				data[sn][key] = os.path.basename(fn)[:-4]+'dat'
+			new_job['upstream'] = data[sn].keys()
+		jobs.append(new_job)
 
 	#---master loop
 	for outgoing in jobs:
@@ -125,7 +123,7 @@ def computer(function,**kwargs):
 				else: unaccounted = []
 				if 'upstream' in unaccounted and 'upstream' not in attrs: 
 					status('automatically appending upstream data',tag='status')
-					unaccounted.pop('upstream')
+					unaccounted.remove('upstream')
 					attrs['upstream'] = calc['specs']['upstream']
 				if any(unaccounted):
 					status('some calculation specs were not saved: %s'%

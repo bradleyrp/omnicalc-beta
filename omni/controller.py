@@ -62,7 +62,7 @@ def plot(plotname,nox=False):
 	if len(search)!=1: status('unclear search for %s: %s'%(plotname,str(search)))
 	else: 
 		status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
-		os.system('./'+search[0]+(' nox' if nox else ''))
+		os.system('python '+search[0]+(' nox' if nox else ''))
 
 def tests(specfile=None,nox=False):
 
