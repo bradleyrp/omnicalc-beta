@@ -36,19 +36,29 @@ def computer(function,**kwargs):
 			new_job['grofile'] = work.postdir+work.slices[sn][slice_name][group]['gro']
 			new_job['trajfile'] = work.postdir+work.slices[sn][slice_name][group]['xtc']
 		if 'upstream' in calc['specs']:
+			#---if no loop on upstream you can use a list
+			if type(calc['specs']['upstream'])==list: 
+				upstream_ask = dict([(key,None) for key in calc['specs']['upstream']])
+			else: upstream_ask = calc['specs']['upstream']
+			#for key,val in calc['specs']['upstream']:
+			#	if type(val)==str and val in ['None','none']: 
 			#---for each upstream spec we locate the associated postprocessing data file
-			for key,val in calc['specs']['upstream'].items():
+			for key,val in upstream_ask.items():
 				upspecs = deepcopy(work.calc[key])
 				#---identify the list of particular options along with the 
 				options,stubs = work.interpret_specs(upspecs,return_stubs=True)
 				#---identify paths and values over which we "whittle" the total list of specs
 				whittles = [(i,j) for i,j in catalog(val)]
-				#---select the correct option by matching all catalogued routes from the incoming
-				#---...key to the original calculation
-				select = [options[ss] for r,v in whittles for ss,s in enumerate(stubs) 
-					if delve(s['specs'],*r)==v]
-				if len(select)!=1: raise Exception('[ERROR] redundant upstream selection %s'%str(select))
-				else: specs = select[0]
+				#---if no loop on upstream pickles we interpret none and send blank specs
+				if val in ['None','none',None]: specs = {'specs':{}}
+				else:
+					#---select the correct option by matching all catalogued routes from the incoming
+					#---...key to the original calculation
+					select = [options[ss] for r,v in whittles for ss,s in enumerate(stubs) 
+						if delve(s['specs'],*r)==v]
+					if len(select)!=1: 
+						raise Exception('[ERROR] redundant upstream selection %s'%str(select))
+					else: specs = select[0]
 				#---if the upstream calculation has a group then use it in the filename
 				if not group:
 					if 'group' in work.calc[key]: upgroup = work.calc[key]['group']

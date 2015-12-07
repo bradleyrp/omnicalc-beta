@@ -62,7 +62,7 @@ def plot(plotname,nox=False):
 	if len(search)!=1: status('unclear search for %s: %s'%(plotname,str(search)))
 	else: 
 		status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
-		os.system('python '+search[0]+(' nox' if nox else ''))
+		os.system('python -i '+search[0]+(' nox' if nox else ''))
 
 def tests(specfile=None,nox=False):
 
@@ -76,7 +76,7 @@ def tests(specfile=None,nox=False):
 	with open(specfile,'r') as fp: test_plot_names = yaml.load(fp.read())['test_plots']
 	for name in test_plot_names:
 		print '[TEST SUITE] plotting %s'%name
-		subprocess.check_call(['python','calcs/plot-%s.py'%name]+(['nox'] if nox else []))
+		subprocess.check_call(['python -i','calcs/plot-%s.py'%name]+(['nox'] if nox else []))
 
 #---INTERFACE
 #-------------------------------------------------------------------------------------------------------------

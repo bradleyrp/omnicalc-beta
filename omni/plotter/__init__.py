@@ -22,3 +22,4 @@ mpl.rc('font',**{'family':'sans-serif','sans-serif':
 from panels import panelplot
 from features import *
 from base.store import picturesave,picturedat,picturefind
+from extras import *

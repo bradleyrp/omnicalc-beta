@@ -71,52 +71,60 @@ def plotload(plotname,work,specfile=None,choice_override=None):
 		plotspecs = yaml.load(fp.read())['plots'][plotname]
 	
 	#---load the calculation from the workspace
-	calcname = plotspecs['calculation']
-	status('you must update work.calc with "make compute dry" if it is out of date',tag='warning')
-	#---in case of loops we compile all possible calculation specs
-	calcs = work.interpret_specs(work.calc[calcname])
-	if len(calcs)==0: raise Exception('[ERROR] failed to retrieve calculations')
+	calcnames = plotspecs['calculation']
+	status('update work.calc with "make compute dry" if it is out of date',tag='warning')
+
+	#---loop over calcnames requested in the plot specs
+	datasets = {name:[] for name in calcnames}
+	calcsets = {name:[] for name in calcnames}
+	for calcname in calcnames:
+		
+		calcs = work.interpret_specs(work.calc[calcname])
+		if len(calcs)==0: raise Exception('[ERROR] failed to retrieve calculations')
 	
-	#---get the group from either plotspecs or the calculation or exception
-	if 'group' in plotspecs: group = plotspecs['group']
-	elif 'group' in work.calc[calcname]: group = work.calc[calcname]['group']
-	else: group = None
-	#---get the collection from either plotspecs or the upstream calculation
-	if 'collections' in plotspecs: collections = plotspecs['collections']
-	else: collections = calc['collections']
-	sns = flatten([work.vars['collections'][c] for c in collections])
+		#---get the group from either plotspecs or the calculation or exception
+		if 'group' in plotspecs: group = plotspecs['group']
+		elif 'group' in work.calc[calcname]: group = work.calc[calcname]['group']
+		else: group = None
+		#---get the collection from either plotspecs or the upstream calculation
+		if 'collections' in plotspecs: collections = plotspecs['collections']
+		else: collections = calc['collections']
+		sns = flatten([work.vars['collections'][c] for c in collections])
 
-	#---compile all upstream data
-	data = [{} for c in calcs]
-	#---iterate over the loop over upstream calculations
-	for calcnum,calcwhittle in enumerate(calcs):
+		#---compile all upstream data
+		data = [{} for c in calcs]
+	
+		#---iterate over the loop over upstream calculations
+		for calcnum,calcwhittle in enumerate(calcs):
 
-		status('upstream data type: %s'%str(calcwhittle),tag='load')
-		calc = deepcopy(work.calc[calcname])
-		#---loop over simulations 
-		for snum,sn in enumerate(sns):
-			status(sn,tag='load',i=snum,looplen=len(sns))
-			#---assume slices in plotspecs
-			if 'slices' in plotspecs: sl = work.slices[sn][plotspecs['slices']]['all' if not group else group]
-			else: raise Exception('[ERROR] cannot infer slices')
-			#---compute base filename
-			if not group: 
-				fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',sl['filekey'])[0]+'.%s'%calcname
-			else: fn_base = '%s.%s'%(sl['filekey'],calcname)
-			#---fill in upstream details in our replicate of the calculation specs
-			for route,val in [(i,j) for i,j in catalog(calcwhittle)]:
-				endpoint = delve(work.calc[calcname],*route)
-				if type(endpoint)==dict and 'loop' in endpoint: 
-					penultimate = delve(calc,*route[:-1])
-					penultimate[route[-1]] = val
-			#---get the dat file and package it
-			dat_fn = os.path.basename(work.select_postdata(fn_base,calc))[:-4]+'dat'
-			data[calcnum][sn] = {'data':load(dat_fn,work.postdir),
-				'slice':sl,'group':group,'fn_base':fn_base}
-
-	#---if only one calculation type then we elevante package
-	if len(calcs)==1: calcs,data = calcs[0],data[0]
-	return data,calcs
+			status('upstream data type: %s'%str(calcwhittle),tag='load')
+			calc = deepcopy(work.calc[calcname])
+			#---loop over simulations 
+			for snum,sn in enumerate(sns):
+				status(sn,tag='load',i=snum,looplen=len(sns))
+				#---assume slices in plotspecs
+				if 'slices' in plotspecs: sl = work.slices[sn][plotspecs['slices']]['all' if not group else group]
+				else: raise Exception('[ERROR] cannot infer slices')
+				#---compute base filename
+				if not group: 
+					fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',sl['filekey'])[0]+'.%s'%calcname
+				else: fn_base = '%s.%s'%(sl['filekey'],calcname)
+				#---fill in upstream details in our replicate of the calculation specs
+				for route,val in [(i,j) for i,j in catalog(calcwhittle)]:
+					endpoint = delve(work.calc[calcname],*route)
+					if type(endpoint)==dict and 'loop' in endpoint: 
+						penultimate = delve(calc,*route[:-1])
+						penultimate[route[-1]] = val
+				#---get the dat file and package it
+				dat_fn = os.path.basename(work.select_postdata(fn_base,calc))[:-4]+'dat'
+				data[calcnum][sn] = {'data':load(dat_fn,work.postdir),
+					'slice':sl,'group':group,'fn_base':fn_base}
+		#---if only one calculation of this type then we elevate package
+		if len(calcs)==1: calcs,data = calcs[0],data[0]
+		datasets[calcname],calcsets[calcname] = data,calcs
+	#---if only one upstream calculation we return that directly
+	if len(datasets)==1: return datasets.values()[0],calcsets.values()[0]
+	else: return datasets,calcsets
 
 def picturesave(savename,directory='./',meta=None,extras=[],backup=False,
 	dpi=300,form='png',version=False):

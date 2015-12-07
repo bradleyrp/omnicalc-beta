@@ -79,14 +79,18 @@ class Workspace():
 			setattr(self,key,incoming.__dict__[key])
 		if previous: self.previous = incoming
 			
-	def save(self):
+	def save(self,quiet=False):
 
 		"""
 		Write the class to a pickle.
 		Consider another format which is more ordered.
 		"""
 
-		pickle.dump(self,open(self.filename,'wb'))
+		import time
+		from threading import Thread
+		if not quiet: status('saving',tag='work')
+		th = Thread(target=pickle.dump(self,open(self.filename,'wb')));th.start();th.join()
+		if not quiet: status('done saving',tag='work')
 
 	def bootstrap(self):
 
@@ -572,7 +576,7 @@ class Workspace():
 					kwargs = {'group':group,'select':select,'sn':sn}
 					if dry: kwargs['dry'] = True
 					self.create_group(**kwargs)
-					self.save()
+					self.save(quiet=True)
 				root.pop('groups')
 
 			#---slice the trajectory
@@ -586,7 +590,7 @@ class Workspace():
 						if 'pbc' in details: kwargs['pbc'] = details['pbc']
 						if dry: kwargs['dry'] = True
 						self.create_slice(**kwargs)
-						self.save()
+						self.save(quiet=True)
 				root.pop('slices')
 			if root != {}: raise Exception('[ERROR] unprocessed specifications %s'%str(root))
 			else: del root
@@ -599,14 +603,18 @@ class Workspace():
 
 		#---collections are groups of simulations
 		if 'collections' in specs: self.vars['collections'] = specs['collections']
-
 		#---calculations are executed last
 		if 'calculations' in specs:
 			#---note that most variables including calc mirror the specs file
 			self.calc = dict(specs['calculations'])
-			#---calculations which require simulations are performed first
-			calckeys = [key for key,val in specs['calculations'].items() if val['uptype']=='simulation']
-			calckeys += [key for key,val in specs['calculations'].items() if val['uptype']!='simulation']
+			#---infer the correct order for the calculation keys from their upstream dependencies
+			depends = {t[0]:[t[ii+1] for ii,i in enumerate(t) if ii<len(t)-1 and t[ii]=='upstream'] 
+				for t in [i for i,j in catalog(self.calc) if 'upstream' in i]}
+			calckeys = [i for i in self.calc if i not in depends]
+			while any(depends):
+				ii,i = depends.popitem()
+				if all([j in calckeys for j in i]) and i!=[]: calckeys.append(ii)
+				else: depends[ii] = i
 			#---if a specific calculation name is given then only perform that calculation
 			if not calculation_name is None: calckeys = [calculation_name]
 			for calcname in calckeys:
