@@ -153,8 +153,10 @@ class Workspace():
 		Return sorted simulation keys.
 		"""
 		
-		return [self.toc.keys()[j] for j in 
+		try: keys = [self.toc.keys()[j] for j in 
 			argsort(map(lambda x:int(re.findall('^.+-v([0-9]+)',x)[0]),self.toc.keys()))]
+		except: keys = self.toc.keys()
+		return keys
 
 	def shortname(self,sn):
 
