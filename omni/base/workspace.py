@@ -10,6 +10,7 @@ from base.gromacs_interface import edrcheck,slice_trajectory,machine_name
 from base.hypothesis import hypothesis
 from base.computer import computer
 from base.timer import checktime
+from base.store import picturefind
 from copy import deepcopy
 import MDAnalysis
 
@@ -347,6 +348,14 @@ class Workspace():
 		else: return [j for k in 
 			[ordered[i] for i in ordered if re.match('^(%s)'%('|'.join(letters)),i)]
 			for j in k]
+			
+	def picture(self,plotname,meta=None):
+	
+		"""
+		Call picturefind with the plot directory from this workspace.
+		"""
+		
+		return picturefind('fig.%s'%plotname,directory=self.paths['post_plot_spot'],meta=meta)
 
 	#---POSTPROCESSING SIMULATIONS
 
