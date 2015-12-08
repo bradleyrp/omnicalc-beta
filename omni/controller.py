@@ -76,7 +76,7 @@ def tests(specfile=None,nox=False):
 	with open(specfile,'r') as fp: test_plot_names = yaml.load(fp.read())['test_plots']
 	for name in test_plot_names:
 		print '[TEST SUITE] plotting %s'%name
-		subprocess.check_call(['python -i','calcs/plot-%s.py'%name]+(['nox'] if nox else []))
+		os.system('python calcs/plot-'+name+'.py'+(' nox' if nox else ''))
 
 #---INTERFACE
 #-------------------------------------------------------------------------------------------------------------
