@@ -11,14 +11,14 @@ from base.tools import unpacker,delve,status
 #---CONFIGURE
 #-------------------------------------------------------------------------------------------------------------
 
-def config():
+def config(defaults=False):
 
 	"""
 	Configure paths and GROMACS paths.
 	All configuration files (paths.py, gromacs.py) are local.
 	"""
 	
-	if not os.path.isfile(conf_paths): bootstrap_paths()
+	if not os.path.isfile(conf_paths): bootstrap_paths(defaults=True if 'defaults' in sys.argv else False)
 	if not os.path.isfile(conf_gromacs): bootstrap_gromacs()
 	
 #---always configure

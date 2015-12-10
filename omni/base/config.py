@@ -118,7 +118,7 @@ def bootstrap_gromacs():
 	for line in default_configuration_gromacs.split('\n'): print '|  '+re.sub('\t','  ',line)
 	print "[STATUS] edit this file at %s"%fn
 	
-def bootstrap_paths():
+def bootstrap_paths(defaults=False):
 
 	"""
 	Prepare a new paths configuration.
@@ -129,16 +129,17 @@ def bootstrap_paths():
 	if os.path.exists(fn): raise Exception('[DEVERROR] only bootstrap if paths.py is absent')
 	paths_script = str(default_paths)
 	#---begin user intervention because paths are crucial
-	for key in ['DATA','POST','PLOT','WORK','SPECS']:
-		prompt = '[QUESTION] enter a %s'%config_help[key]['name']
-		if config_help[key]['default'] is not None:
-			prompt += ' (enter for default: %s): '%config_help[key]['default']
-		else: prompt += ': '
-		ans = raw_input(prompt)
-		if ans == '' and config_help[key]['default'] is not None:
-			ans = config_help[key]['default']
-		if not config_help[key]['valid'](ans): raise Exception('[ERROR] invalid response')
-		else: paths_script = re.sub(key,"'%s'"%ans,paths_script)
+	if not defaults:
+		for key in ['DATA','POST','PLOT','WORK','SPECS']:
+			prompt = '[QUESTION] enter a %s'%config_help[key]['name']
+			if config_help[key]['default'] is not None:
+				prompt += ' (enter for default: %s): '%config_help[key]['default']
+			else: prompt += ': '
+			ans = raw_input(prompt)
+			if ans == '' and config_help[key]['default'] is not None:
+				ans = config_help[key]['default']
+			if not config_help[key]['valid'](ans): raise Exception('[ERROR] invalid response')
+			else: paths_script = re.sub(key,"'%s'"%ans,paths_script)
 	#---end user intervention
 	with open(fn,'w') as fp: 
 		fp.write(paths_script)
@@ -147,3 +148,4 @@ def bootstrap_paths():
 	for line in paths_script.split('\n'): print '|  '+re.sub('\t','  ',line)
 	print '[STATUS] edit this file at %s'%fn	
 	print "[NOTE] modify the parse_specs variable in %s to search the dataset"%fn
+
