@@ -105,7 +105,8 @@ def plotload(plotname,work,specfile=None,choice_override=None):
 			for snum,sn in enumerate(sns):
 				status(sn,tag='load',i=snum,looplen=len(sns))
 				#---assume slices in plotspecs
-				if 'slices' in plotspecs: sl = work.slices[sn][plotspecs['slices']]['all' if not group else group]
+				if 'slices' in plotspecs: sl = work.slices[sn][plotspecs['slices']][
+					'all' if not group else group]
 				else: raise Exception('[ERROR] cannot infer slices')
 				#---compute base filename
 				if not group: 
@@ -118,7 +119,11 @@ def plotload(plotname,work,specfile=None,choice_override=None):
 						penultimate = delve(calc,*route[:-1])
 						penultimate[route[-1]] = val
 				#---get the dat file and package it
-				dat_fn = os.path.basename(work.select_postdata(fn_base,calc))[:-4]+'dat'
+				fn = work.select_postdata(fn_base,calc,debug=True)
+				if fn == None: 
+					print '[ERROR] cannot locate a file necessary for plotting'
+					import pdb;pdb.set_trace()
+				dat_fn = os.path.basename(fn)[:-4]+'dat'
 				data[calcnum][sn] = {'data':load(dat_fn,work.postdir),
 					'slice':sl,'group':group,'fn_base':fn_base}
 		#---if only one calculation of this type then we elevate package
