@@ -118,10 +118,12 @@ def bootstrap_gromacs():
 	for line in default_configuration_gromacs.split('\n'): print '|  '+re.sub('\t','  ',line)
 	print "[STATUS] edit this file at %s"%fn
 	
-def bootstrap_paths(defaults=False):
+def bootstrap_paths(defaults=False,post=None,plot=None):
 
 	"""
 	Prepare a new paths configuration.
+	You must use defaults=True with post and plot otherwise this will still ask the user.
+	You also must use plot and post together.
 	"""
 
 	print '[BOOT] bootstrapping default paths'	
@@ -129,17 +131,21 @@ def bootstrap_paths(defaults=False):
 	if os.path.exists(fn): raise Exception('[DEVERROR] only bootstrap if paths.py is absent')
 	paths_script = str(default_paths)
 	#---begin user intervention because paths are crucial
-	if not defaults:
-		for key in ['DATA','POST','PLOT','WORK','SPECS']:
+	for key in ['DATA','POST','PLOT','WORK','SPECS']:
+		ans = ''
+		if key == 'POST' and post != None: ans = post
+		if key == 'PLOT' and post != None: ans = plot
+		if not defaults:
 			prompt = '[QUESTION] enter a %s'%config_help[key]['name']
 			if config_help[key]['default'] is not None:
 				prompt += ' (enter for default: %s): '%config_help[key]['default']
 			else: prompt += ': '
 			ans = raw_input(prompt)
-			if ans == '' and config_help[key]['default'] is not None:
-				ans = config_help[key]['default']
-			if not config_help[key]['valid'](ans): raise Exception('[ERROR] invalid response')
-			else: paths_script = re.sub(key,"'%s'"%ans,paths_script)
+		if ans == '' and config_help[key]['default'] is not None:
+			ans = config_help[key]['default']
+		if not config_help[key]['valid'](ans): raise Exception('[ERROR] invalid response')
+		else: paths_script = re.sub(key,"'%s'"%ans,paths_script)
+	#import pdb;pdb.set_trace()
 	#---end user intervention
 	with open(fn,'w') as fp: 
 		fp.write(paths_script)

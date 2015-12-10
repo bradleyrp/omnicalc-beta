@@ -11,20 +11,16 @@ from base.tools import unpacker,delve,status
 #---CONFIGURE
 #-------------------------------------------------------------------------------------------------------------
 
-def config(defaults=False):
+def config(defaults=False,post=None,plot=None):
 
 	"""
 	Configure paths and GROMACS paths.
 	All configuration files (paths.py, gromacs.py) are local.
 	"""
 	
-	if not os.path.isfile(conf_paths): bootstrap_paths(defaults=True if 'defaults' in sys.argv else False)
+	if not os.path.isfile(conf_paths): bootstrap_paths(defaults=defaults,post=post,plot=plot)
 	if not os.path.isfile(conf_gromacs): bootstrap_gromacs()
-	
-#---always configure
-config()
-from base.computer import computer	
-	
+
 #---FUNCTIONS
 #-------------------------------------------------------------------------------------------------------------
 
@@ -94,6 +90,9 @@ def makeface(*arglist):
 	arglist = list(arglist)
 	if '--' in arglist: arglist.remove('--')
 	funcname = arglist.pop(0)
+	#---if not configured we exit
+	if (not os.path.isfile(conf_paths) or not os.path.isfile(conf_gromacs)) and funcname != 'config': 
+		raise Exception('\n[ERROR] run make config to generate gromacs.py and paths.py')
 	while len(arglist)>0:
 		arg = arglist.pop(0)
 		regex = '^([^\=]+)\=(.+)'
