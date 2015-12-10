@@ -88,7 +88,8 @@ def makeface(*arglist):
 		raise Exception('[ERROR] no arguments to controller')
 	aargs,kwargs = [],{}
 	arglist = list(arglist)
-	if '--' in arglist: arglist.remove('--')
+	for stray in ['--','w']:
+		if stray in arglist: arglist.remove(stray)
 	funcname = arglist.pop(0)
 	#---if not configured we exit
 	if (not os.path.isfile(conf_paths) or not os.path.isfile(conf_gromacs)) and funcname != 'config': 
