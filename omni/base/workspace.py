@@ -622,7 +622,8 @@ class Workspace():
 			#---note that most variables including calc mirror the specs file
 			self.calc = dict(specs['calculations'])
 			#---infer the correct order for the calculation keys from their upstream dependencies
-			depends = {t[0]:[t[ii+1] for ii,i in enumerate(t) if ii<len(t)-1 and t[ii]=='upstream'] for t in [i for i,j in catalog(self.calc) if 'upstream' in i]}
+			depends = {t[0]:[t[ii+1] for ii,i in enumerate(t) if ii<len(t)-1 and t[ii]=='upstream'] 
+				for t in [i for i,j in catalog(self.calc) if 'upstream' in i]}
 			calckeys = [i for i in self.calc if i not in depends]
 			"""
 			depends_keys = depends.keys()

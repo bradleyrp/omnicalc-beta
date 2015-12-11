@@ -63,6 +63,7 @@ def plotload(plotname,work,specfile=None,choice_override=None):
 
 	"""
 	Load postprocessing data for making a plot.
+	Note that we currently do not use the specs items.
 	"""
 
 	#---read plot specification
