@@ -452,7 +452,8 @@ class Workspace():
 		name = kwargs['group']
 		select = kwargs['select']
 		cols = 100 if 'cols' not in kwargs else kwargs['cols']
-		simkey = 'v%s.%s'%(self.shortname(sn),name)
+		prefix = 'v' if type(self.shortname(sn))==int else ''
+		simkey = '%s%s.%s'%(prefix,self.shortname(sn),name)
 		fn = '%s.ndx'%simkey
 
 		#---see if we need to make this group
@@ -516,7 +517,8 @@ class Workspace():
 		group = kwargs['group']
 		slice_name = kwargs['slice_name']
 		pbc = kwargs['pbc'] if 'pbc' in kwargs else None
-		outkey = 'v%s.%d-%d-%d.%s%s'%(self.shortname(sn),start,end,skip,
+		prefix='v' if type(self.shortname(sn))==int else ''
+		outkey = '%s%s.%d-%d-%d.%s%s'%(prefix,self.shortname(sn),start,end,skip,
 			group,'' if pbc==None else '.pbc%s'%pbc)
 		grofile,trajfile = outkey+'.gro',outkey+'.xtc'
 		both_there = all([os.path.isfile(self.postdir+fn) for fn in [grofile,trajfile]])

@@ -35,6 +35,7 @@ def computer(function,**kwargs):
 			#---prepare combinations in a dictionary
 			new_job['grofile'] = work.postdir+work.slices[sn][slice_name][group]['gro']
 			new_job['trajfile'] = work.postdir+work.slices[sn][slice_name][group]['xtc']
+		if 'specs' not in calc: calc['specs'] = ''
 		if 'upstream' in calc['specs']:
 			#---if no loop on upstream you can use a list
 			if type(calc['specs']['upstream'])==list: 
@@ -140,9 +141,11 @@ def computer(function,**kwargs):
 				if any(unaccounted):
 					status('some calculation specs were not saved: %s'%
 						str(unaccounted),tag='warning')
-					raise Exception('\n[ERROR] a calculation spec was not added to the attributes and '+
-						'hence these data will not be found by plotloader later on. '+
-						'Add the specs to attrs in your calculation function to continue.')
+					print '[ERROR] a calculation spec was not added to the attributes and '+\
+						'hence these data will not be found by plotloader later on. '+\
+						'Add the specs to attrs in your calculation function to continue.'
+					import pdb;pdb.set_trace()
+					raise Exception
 				store(result,fn,work.postdir,attrs=attrs)
 				with open(work.postdir+fn_base+fn_key+'.spec','w') as fp: fp.write(json.dumps(attrs)+'\n')
 				#---previously stored lookup logic but this is contained in calcspecs and can be inferred
