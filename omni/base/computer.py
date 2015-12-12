@@ -73,7 +73,9 @@ def computer(function,**kwargs):
 					sl = work.slices[sn][slice_name][upgroup]
 					fn_base = '%s.%s'%(sl['filekey'],key)
 				fn = work.select_postdata(fn_base,specs)
-				if not fn: raise Exception('[ERROR] missing %s'%fn)
+				if not fn: 
+					import pdb;pdb.set_trace()
+					raise Exception('[ERROR] missing %s'%fn)
 				#---before each calculation the master loop loads the filename stored here
 				data[sn][key] = os.path.basename(fn)[:-4]+'dat'
 			new_job['upstream'] = data[sn].keys()

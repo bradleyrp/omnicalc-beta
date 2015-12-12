@@ -80,7 +80,7 @@ if 'modules' in machine_configuration:
 suffix = '' if 'suffix' not in machine_configuration else machine_configuration['suffix']
 check_gmx = subprocess.Popen('gmx%s'%suffix,shell=True,
 	stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
-if not re.search('command not found',check_gmx[1]): gmx_series = 5
+if not re.search('not found',check_gmx[1]): gmx_series = 5
 else:
 	check_mdrun = ' '.join(subprocess.Popen('mdrun%s -g /tmp/md.log'%suffix,
 		shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate())

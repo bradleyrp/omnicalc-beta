@@ -379,7 +379,7 @@ class Workspace():
 			else: raise Exception('\n[ERROR] file was invalid and must be deleted manually:\n%s'%fn)
 			#---! later allow a file deletion if the user says the file is invalid			
 
-	def select_postdata(self,fn_base,calc):
+	def select_postdata(self,fn_base,calc,debug=False):
 	
 		"""
 		Search postprocess spec files for a match with a calculation.
@@ -395,6 +395,8 @@ class Workspace():
 			extra_keys = [key for key in chop if key not in calc['specs']]
 			for key in extra_keys: del chop[key]
 			if calc['specs']==chop: return specfn
+		if debug: 
+			import pdb;pdb.set_trace()
 		return None
 
 	def collection(self,*args):
@@ -616,12 +618,24 @@ class Workspace():
 		if 'collections' in specs: self.vars['collections'] = specs['collections']
 		#---calculations are executed last
 		if 'calculations' in specs:
+			status('starting calculations',tag='status')
 			#---note that most variables including calc mirror the specs file
 			self.calc = dict(specs['calculations'])
 			#---infer the correct order for the calculation keys from their upstream dependencies
 			depends = {t[0]:[t[ii+1] for ii,i in enumerate(t) if ii<len(t)-1 and t[ii]=='upstream'] 
 				for t in [i for i,j in catalog(self.calc) if 'upstream' in i]}
 			calckeys = [i for i in self.calc if i not in depends]
+			"""
+			depends_keys = depends.keys()
+			while any(depends_keys):
+				ii = depends_keys.pop(0)
+				i = depends[ii]
+				if all([j in calckeys for j in i]) and i!=[]: 
+					calckeys.append(ii)
+					depends.pop(ii)
+				else: depends_keys.append(ii)
+				print depends_keys
+			"""
 			while any(depends):
 				ii,i = depends.popitem()
 				if all([j in calckeys for j in i]) and i!=[]: calckeys.append(ii)
