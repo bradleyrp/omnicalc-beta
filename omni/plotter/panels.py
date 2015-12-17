@@ -43,6 +43,7 @@ def panelplot(layout=None,figsize=(8,8)):
 	if 'hratios' in lay['out']: outer_grid.set_height_ratios(lay['out']['hratios'])
 	if 'wratios' in lay['out']: outer_grid.set_width_ratios(lay['out']['wratios'])
 	for ii,spot in enumerate(list(itertools.product(*[arange(i) for i in lay['out']['grid']]))):
+		if ii>len(lay['ins'])-1: raise Exception('looks like you have too few ins')
 		hspace = lay['ins'][ii]['hspace'] if 'hspace' in lay['ins'][ii] else None
 		wspace = lay['ins'][ii]['wspace'] if 'wspace' in lay['ins'][ii] else None
 		inner_grid = gridspec.GridSpecFromSubplotSpec(*lay['ins'][ii]['grid'],

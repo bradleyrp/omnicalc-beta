@@ -148,7 +148,7 @@ def picturesave(savename,directory='./',meta=None,extras=[],backup=False,
 		search = picturefind(savename,directory=directory,meta=meta)
 		if not search:
 			if meta == None: raise Exception('[ERROR] versioned image saving requires meta')
-			fns = glob.glob(directory+'/'+savename+'*')
+			fns = glob.glob(directory+'/'+savename+'.v*')
 			nums = [int(re.findall('^.+\.v([0-9]+)\.png',fn)[0]) for fn in fns 
 				if re.match('^.+\.v[0-9]+\.png',fn)]
 			ind = max(nums)+1 if nums != [] else 1
@@ -200,12 +200,14 @@ def picturefind(savename,directory='./',meta=None):
 
 	status('searching pictures',tag='store')
 	regex = '^.+\.v([0-9]+)\.png'
-	fns = glob.glob(directory+'/'+savename+'*')
+	fns = glob.glob(directory+'/'+savename+'.v*')
 	nums = map(lambda y:(y,int(re.findall(regex,y)[0])),filter(lambda x:re.match(regex,x),fns))
 	matches = [fn for fn,num in nums if meta==picturedat(os.path.basename(fn),directory=directory)]
-	if len(matches)>1 and meta!=None: raise Exception('[ERROR] multiple matches found for %s'%savename)
+	if len(matches)>1 and meta!=None: 
+		print '[ERROR] multiple matches found for %s'%savename
+		raise Exception('???')
+		import pdb;pdb.set_trace()
 	if matches==[] and meta==None:
 		return dict([(os.path.basename(fn),
 			picturedat(os.path.basename(fn),directory=directory)) for fn,num in nums]) 
 	return matches if not matches else matches[0]
-

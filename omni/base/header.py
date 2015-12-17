@@ -26,6 +26,7 @@ from base.config import bootstrap_gromacs,bootstrap_paths
 from base.workspace import Workspace
 from base.tools import status,unpacker,flatten,unique
 from base.store import picturedat,picturefind
+from base.timer import checktime
 from functools import wraps
 
 #---get the active workspace
