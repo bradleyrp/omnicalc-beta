@@ -337,7 +337,7 @@ class Workspace():
 		struct = (sn,last_subdir,top[last_subdir][0])
 		return self.rootdir+self.fullpath(*struct,toc='toc_structures')
 
-	def sort_steps(self,sn,letters='su'):
+	def sort_steps(self,sn,letters='sut'):
 
 		"""
 		Sort the subdirectory steps by the first group and then the second group which must be an integer.
