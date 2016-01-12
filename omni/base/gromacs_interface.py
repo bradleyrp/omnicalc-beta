@@ -84,7 +84,7 @@ def slice_trajectory(start,end,skip,seq_time_fn,outkey='TMP',
 	#---convert relevant trajectories
 	for ii,cmd in enumerate(cmdlist):
 		status('slicing trajectory',i=ii,looplen=len(cmdlist),tag='SLICE')
-		call(cmd,logfile='log-trjconv-%d'%ii,cwd=postdir,inpipe='0\n',silent=True)
+		call(cmd,logfile='log-trjconv-%d'%ii,cwd=postdir,inpipe='0\n',silent=False)
 	
 	#---concatenate remaining steps with no errors
 	valid_parts = range(len(chop))

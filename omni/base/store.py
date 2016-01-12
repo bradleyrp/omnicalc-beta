@@ -59,7 +59,7 @@ def load(name,path,verbose=False,filename=False,exclude_slice_source=False):
 	rawdat.close()
 	return data
 	
-def plotload(plotname,work,specfile=None,choice_override=None):
+def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 
 	"""
 	Load postprocessing data for making a plot.
@@ -105,20 +105,61 @@ def plotload(plotname,work,specfile=None,choice_override=None):
 			#---loop over simulations 
 			for snum,sn in enumerate(sns):
 				status(sn,tag='load',i=snum,looplen=len(sns))
-				#---assume slices in plotspecs
-				if 'slices' in plotspecs: sl = work.slices[sn][plotspecs['slices']][
-					'all' if not group else group]
+				#---combine slices here if necessary
+				"""
+				#---the following code violates dry with computer.py
+				import pdb;pdb.set_trace()
+				for slicenum,spec in enumerate(specs):
+					#---if the upstream calculation has a group then use it in the filename
+					if not group:
+						if 'group' in work.calc[key]: upgroup = work.calc[key]['group']
+						else: upgroup = None
+					else: upgroup = group
+					if not upgroup: 
+						sl = work.slices[sn][spec['slice_name']]
+						fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',
+							work.slices[sn][upspecs['slice_name']]['all']['filekey']
+							)[0]+'.%s'%key
+					else: 
+						sl = work.slices[sn][spec['slice_name']][upgroup]
+						fn_base = '%s.%s'%(sl['filekey'],key)
+						fn = work.select_postdata(fn_base,spec)
+						if not fn: 
+							import pdb;pdb.set_trace()
+							raise Exception('[ERROR] missing %s'%fn)
+						outkey = key if len(specs)==1 else '%s%d'%(key,slicenum)
+						#---before each calculation the master loop loads the filename stored here
+						data[sn][outkey] = os.path.basename(fn)[:-4]+'dat'
+				"""
+				#---slices in plotspecs or lookup from variables with plus-syntax
+				if 'slices' in plotspecs and not re.match('^\+',plotspecs['slices']): 
+					sl = work.slices[sn][plotspecs['slices']]['all' if not group else group]
+				elif 'slices' in plotspecs: 
+					sl = deepcopy(delve(work.vars,*plotspecs['slices'].strip('+').split('/')))
+					#---the slice might not have a filekey if its a combo
+					if 'filekey' not in sl:
+						#---! pbc and groups will usually be absent here
+						start,end,skip,pbc = [sl[i] for i in 'start,end,skip,pbc'.split(',')]
+						sl['filekey'] = '%s%s.%d-%d-%d'%('v',work.shortname(sn),start,end,skip)
 				else: raise Exception('[ERROR] cannot infer slices')
 				#---compute base filename
 				if not group: 
 					fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',sl['filekey'])[0]+'.%s'%calcname
+				elif use_group:
+					#---special settings here for loading certain kinds of data eg protein_abstractor
+					fn_base = '%s.%s.pbc%s.%s'%(sl['filekey'],group,sl['pbc'],calcname)
 				else: fn_base = '%s.%s'%(sl['filekey'],calcname)
 				#---fill in upstream details in our replicate of the calculation specs
 				for route,val in [(i,j) for i,j in catalog(calcwhittle)]:
-					endpoint = delve(work.calc[calcname],*route)
+					#---! the plot has to mimic the specs structure exactly otherwise error below
+					try: endpoint = delve(work.calc[calcname],*route)
+					except:
+						import pdb;pdb.set_trace()
 					if type(endpoint)==dict and 'loop' in endpoint: 
-						penultimate = delve(calc,*route[:-1])
-						penultimate[route[-1]] = val
+						try: 
+							penultimate = delve(calc,*route[:-1])
+							penultimate[route[-1]] = val
+						except: pass
 				#---get the dat file and package it
 				fn = work.select_postdata(fn_base,calc,debug=True)
 				if fn == None: 
@@ -211,3 +252,31 @@ def picturefind(savename,directory='./',meta=None):
 		return dict([(os.path.basename(fn),
 			picturedat(os.path.basename(fn),directory=directory)) for fn,num in nums]) 
 	return matches if not matches else matches[0]
+	
+def datmerge(kwargs,name,key,same=False):
+
+	"""
+	Incoming upstream data are sometimes taken from multiple pickles.
+	This function stitches together the key from many of these pickles.
+	"""
+	
+	#---if there is only one upstream object with no index we simply lookup the key we want
+	if name in kwargs['upstream']: return kwargs['upstream'][name][key]
+	else:
+		#---get indices for the upstream object added by computer
+		inds = [int(re.findall(name+'(\d+)',i)[0]) for i in kwargs['upstream'] if re.match(name,i)]
+		collected = [kwargs['upstream']['%s%d'%(name,i)][key] for i in sorted(inds)]
+		if not same:
+			if collected==[]: raise Exception('collected is empty, argument to datmerge is wrong')
+			if type(collected[0])==list: return [i for j in collected for i in j]
+			elif type(collected[0])==numpy.ndarray: 
+				#---sometimes single numbers are saved as 0-dimensional arrays
+				if numpy.shape(collected[0])==(): return numpy.array([float(i) for i in collected])
+				else: return numpy.concatenate(collected)
+			else: raise Exception('\n[ERROR] not sure how to concatenate')
+		else:
+			#---the same flag forces a check that the key is the same in each item of the collected data
+			if any([any(collected[0]!=c) for c in collected[1:]]): 
+				raise Exception('\n[ERROR] objects not same')
+			else: return collected[0]
+

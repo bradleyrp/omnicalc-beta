@@ -279,6 +279,8 @@ class Workspace():
 		matches = [reassemble(re.findall(regex,fn)[0]) for fn in fns if re.match(regex,fn)]
 		if matches == []: raise Exception('[ERROR] failed to find matches')
 		#---toc is a nested dictionary of the available top directories and subdirectories
+		#---note that if we wanted tuples as keys in newtoc we would use the following code:
+		#---"re.findall(self.datahead['toc']['regex'][0],s)[0]" instead of s below
 		newtoc = dict([(s,
 			dict([(re.findall(regex_sub,t)[0],[]) for t in 
 				set([x[1] for x in matches if x[0]==s])
@@ -398,6 +400,18 @@ class Workspace():
 		if debug: 
 			import pdb;pdb.set_trace()
 		return None
+		
+	def collect_times(self,calc,sn,group):
+	
+		"""
+		Collect the timeseries for one or multiple slices in a calculation.
+		"""
+	
+		if type(calc['slice_name'])==str:
+			return self.slices[sn][calc['slice_name']]['all' if not group else group]['timeseries']
+		else: 
+			return concatenate([self.slices[sn][sname]['all' if not group else group]['timeseries']
+				for sname in calc['slice_name']])
 
 	def collection(self,*args):
 
@@ -419,6 +433,8 @@ class Workspace():
 		#---get all paths to a loop
 		nonterm_paths = list([tuple(j) for j in set([tuple(i[:i.index('loop')+1]) 
 			for i,j in catalog(details_trim) if 'loop' in i[:-1]])])
+		nonterm_paths_list = list([tuple(j) for j in set([tuple(i[:i.index('loop')+1]) 
+			for i,j in catalog(details_trim) if i[-1]=='loop'])])
 		#---for each non-terminal path we save everything below and replace it with a key
 		nonterms = []
 		for path in nonterm_paths:
@@ -434,10 +450,16 @@ class Workspace():
 		#---replace non-terminal loop paths with their downstream dictionaries
 		for ii,i in enumerate(nonterms):
 			for nc in new_calcs:
-				downkey = downkey = delve(nc,*nonterm_paths[ii][:-1])
+				downkey = delve(nc,*nonterm_paths[ii][:-1])
 				upkey = nonterm_paths[ii][-2]
 				point = delve(nc,*nonterm_paths[ii][:-2])
 				point[upkey] = nonterms[ii][downkey]
+		#---loops over lists (instead of dictionaries) carry along the entire loop which most be removed
+		for ii,i in enumerate(nonterm_paths_list):
+			for nc in new_calcs: 
+				pivot = delve(nc,*i[:-2]) if len(i)>2 else nc
+				val = delve(nc,*i[:-1])[i[-2]]
+				pivot[i[-2]] = val
 		return new_calcs if not return_stubs else (new_calcs,new_calcs_stubs)
 
 	#---CREATE GROUPS
@@ -452,7 +474,7 @@ class Workspace():
 		name = kwargs['group']
 		select = kwargs['select']
 		cols = 100 if 'cols' not in kwargs else kwargs['cols']
-		prefix = 'v' if type(self.shortname(sn))==int else ''
+		prefix = 'v' if self.shortname(sn).isdigit() else ''
 		simkey = '%s%s.%s'%(prefix,self.shortname(sn),name)
 		fn = '%s.ndx'%simkey
 
@@ -517,7 +539,7 @@ class Workspace():
 		group = kwargs['group']
 		slice_name = kwargs['slice_name']
 		pbc = kwargs['pbc'] if 'pbc' in kwargs else None
-		prefix='v' if type(self.shortname(sn))==int else ''
+		prefix='v' if self.shortname(sn).isdigit() else ''
 		outkey = '%s%s.%d-%d-%d.%s%s'%(prefix,self.shortname(sn),start,end,skip,
 			group,'' if pbc==None else '.pbc%s'%pbc)
 		grofile,trajfile = outkey+'.gro',outkey+'.xtc'
@@ -624,8 +646,13 @@ class Workspace():
 			#---note that most variables including calc mirror the specs file
 			self.calc = dict(specs['calculations'])
 			#---infer the correct order for the calculation keys from their upstream dependencies
+			upstream_catalog = [i for i,j in catalog(self.calc) if 'upstream' in i]
+			#---if there are no specs required to get the upstream data object the user can either 
+			#---...use none/None as a placeholder or use the name as the key as in "upstream: name"
+			for uu,uc in enumerate(upstream_catalog):
+				if uc[-1]=='upstream': upstream_catalog[uu] = upstream_catalog[uu]+[delve(self.calc,*uc)]
 			depends = {t[0]:[t[ii+1] for ii,i in enumerate(t) if ii<len(t)-1 and t[ii]=='upstream'] 
-				for t in [i for i,j in catalog(self.calc) if 'upstream' in i]}
+				for t in upstream_catalog}
 			calckeys = [i for i in self.calc if i not in depends]
 			"""
 			depends_keys = depends.keys()
