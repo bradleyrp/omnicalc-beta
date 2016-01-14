@@ -34,6 +34,9 @@ def computer(function,**kwargs):
 		new_job = {'sn':sn,'slice_name':slice_name,'group':group}
 		if incoming_type == 'simulation':
 			#---prepare combinations in a dictionary
+			if work.slices[sn][slice_name][group]['missing_frame_percent']>work.missing_frame_tolerance:
+				status('upstream slice failure: %s,%s,%s'%(sn,slice_name,group),tag='warning')
+				continue
 			new_job['grofile'] = work.postdir+work.slices[sn][slice_name][group]['gro']
 			new_job['trajfile'] = work.postdir+work.slices[sn][slice_name][group]['xtc']
 		if 'specs' not in calc: calc['specs'] = ''

@@ -40,6 +40,8 @@ class Workspace():
 		self.parse_specs = unpacker(conf_paths,'parse_specs')
 		self.machine = unpacker(conf_gromacs,'machine_configuration')[machine_name]
 		self.nprocs = self.machine['nprocs']
+		#---throw an error if you are missing more than 20% of the data
+		self.missing_frame_tolerance = 0.2
 		self.rootdir = os.path.join(path_expand(self.paths['data_spots'][0]),'')
 		self.postdir = os.path.join(path_expand(self.paths['post_data_spot']),'')
 		self.plotdir = os.path.join(path_expand(self.paths['post_plot_spot']),'')
@@ -550,13 +552,21 @@ class Workspace():
 			if not dry:
 				#---slice is not there or not confirmed so we make a new one here
 				seq_time_fn = self.get_timeseq(sn,strict=False)
-				slice_trajectory(start,end,skip,seq_time_fn,
+				try: slice_trajectory(start,end,skip,seq_time_fn,
 					groupfn=self.postdir+self.groups[sn][group]['fn'],outkey=outkey,pbc=pbc,
 					path=self.fullpath,rootdir=self.rootdir,postdir=self.postdir)
+				except:
+					print "[ERROR] failed to make slice"
+					if slice_name not in self.slices[sn]: self.slices[sn][slice_name] = {}
+					self.slices[sn][slice_name][group] = {'start':start,'end':end,'skip':skip,
+						'group':group,'pbc':pbc,'verified':False,'filekey':outkey,
+						'gro':grofile,'xtc':trajfile,'missing_frame_percent':100.}
+					return
 		print '[STATUS] checking timestamps of slice: %s'%outkey
 		#---slice is made or preexisting and now we validate
 		timeseries = self.slice_timeseries(self.postdir+grofile,self.postdir+trajfile)
 		import numpy as np
+		missing_frame_percent = 1.-len(np.arange(start,end+skip,skip))/float(len(timeseries))
 		if len(timeseries)!=len(np.arange(start,end+skip,skip)): verified = False
 		else:
 			try: verified = all(np.array(timeseries).astype(float)==
@@ -566,7 +576,7 @@ class Workspace():
 		if slice_name not in self.slices[sn]: self.slices[sn][slice_name] = {}
 		self.slices[sn][slice_name][group] = {'start':start,'end':end,'skip':skip,
 			'group':group,'pbc':pbc,'verified':verified,'timeseries':timeseries,'filekey':outkey,
-			'gro':grofile,'xtc':trajfile}
+			'gro':grofile,'xtc':trajfile,'missing_frame_percent':missing_frame_percent}
 			
 	#---READ SPECIFICATIONS FILES
 
