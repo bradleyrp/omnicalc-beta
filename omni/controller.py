@@ -44,6 +44,20 @@ def look(workspace=None,nox=False):
 	"""
 
 	os.system('python -i ./omni/base/header.py'+(' nox' if nox else ''))
+
+def refresh(specfile=None,workspace=None,autoreload=False,dry=False):
+
+	"""
+	If you have new data or more data (i.e. more XTC files or longer trajectories) you must
+	run refresh in order to add those files to the tables of contents.
+	"""
+
+	from base.workspace import Workspace
+	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
+	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
+	work = Workspace(workspace,previous=False,autoreload=autoreload)
+	work.bootstrap()
+	work.save()
 	
 def plot(plotname,nox=False):
 
