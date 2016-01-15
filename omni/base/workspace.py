@@ -533,8 +533,8 @@ class Workspace():
 		Return a tuple of the minimum and maximum timestamps for a particular simulation.
 		"""
 	
-		return (min([i[0][0] for i in work.get_timeseq(sn)]),
-			max([i[0][1] for i in work.get_timeseq(sn)]))
+		return (min([i[0][0] for i in self.get_timeseq(sn)]),
+			max([i[0][1] for i in self.get_timeseq(sn)]))
 
 	def create_slice(self,**kwargs):
 
