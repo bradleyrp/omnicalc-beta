@@ -526,6 +526,15 @@ class Workspace():
 		seq_time_fn = [(self.edr_times[self.xtc_files.index(fn)],key) for key,fn in seq_key_fn
 			if not strict or (None not in self.edr_times[self.xtc_files.index(fn)])]
 		return seq_time_fn
+		
+	def get_timeseq_range(self,sn):
+	
+		"""
+		Return a tuple of the minimum and maximum timestamps for a particular simulation.
+		"""
+	
+		return (min([i[0][0] for i in work.get_timeseq(sn)]),
+			max([i[0][1] for i in work.get_timeseq(sn)]))
 
 	def create_slice(self,**kwargs):
 
