@@ -68,9 +68,13 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 
 	#---read plot specification
 	if not specfile: specfile = work.paths['specs_file']
-	with open(specfile,'r') as fp:
-		plotspecs = yaml.load(fp.read())['plots'][plotname]
-	
+	#---load the yaml specifications file
+	if type(specfile)==str: specfile = [specfile]
+	raw_specs = ''
+	for sfn in specfile: 
+		with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
+	plotspecs = yaml.load(raw_specs)['plots'][plotname]
+
 	#---load the calculation from the workspace
 	calcnames = plotspecs['calculation']
 	status('update work.calc with "make compute dry" if it is out of date',tag='warning')

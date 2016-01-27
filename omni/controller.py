@@ -59,7 +59,7 @@ def refresh(specfile=None,workspace=None,autoreload=False,dry=False):
 	work.bootstrap()
 	work.save()
 	
-def plot(plotname,nox=False):
+def plot(plotname,nox=False,**kwargs):
 
 	"""
 	Run a plotting routine.
@@ -72,7 +72,7 @@ def plot(plotname,nox=False):
 	if len(search)!=1: status('unclear search for %s: %s'%(plotname,str(search)))
 	else: 
 		status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
-		os.system('python -i '+search[0]+(' nox' if nox else ''))
+		os.system('python -i '+search[0]+(' nox' if nox else '')+' "%s"'%kwargs)
 
 def tests(specfile=None,nox=False):
 

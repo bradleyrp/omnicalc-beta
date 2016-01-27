@@ -597,7 +597,10 @@ class Workspace():
 
 		status('parsing specs file',tag='status')
 		#---load the yaml specifications file
-		with open(spec_fn,'r') as fp: raw_specs = fp.read()
+		if type(spec_fn)==str: spec_fn = [spec_fn]
+		raw_specs = ''
+		for sfn in spec_fn: 
+			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
 		specs = yaml.load(raw_specs)
 		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
 			self.paths['specs_file'])
