@@ -34,6 +34,9 @@ def computer(function,**kwargs):
 		new_job = {'sn':sn,'slice_name':slice_name,'group':group}
 		if incoming_type == 'simulation':
 			#---prepare combinations in a dictionary
+			if slice_name not in work.slices[sn]:
+				raise Exception('\n[ERROR] the slices yaml file is missing a slice named "%s" for simulation "%s"'%
+					(slice_name,sn))
 			if work.slices[sn][slice_name][group]['missing_frame_percent']>work.missing_frame_tolerance:
 				status('upstream slice failure: %s,%s,%s'%(sn,slice_name,group),tag='warning')
 				continue

@@ -48,6 +48,8 @@ def panelplot(layout=None,figsize=(8,8)):
 		wspace = lay['ins'][ii]['wspace'] if 'wspace' in lay['ins'][ii] else None
 		inner_grid = gridspec.GridSpecFromSubplotSpec(*lay['ins'][ii]['grid'],
 			wspace=wspace,hspace=hspace,subplot_spec=outer_grid[ii])
+		if 'hratios' in lay['ins'][ii]: inner_grid.set_width_ratios(lay['ins'][ii]['hratios'])
+		if 'wratios' in lay['ins'][ii]: inner_grid.set_width_ratios(lay['ins'][ii]['wratios'])
 		inaxs = [fig.add_subplot(j) for j in inner_grid]
 		axpos.append(list(itertools.product(*[arange(i) for i in lay['ins'][ii]['grid']])))
 		axes.append(inaxs)

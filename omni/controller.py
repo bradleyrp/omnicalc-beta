@@ -59,20 +59,60 @@ def refresh(specfile=None,workspace=None,autoreload=False,dry=False):
 	work.bootstrap()
 	work.save()
 	
-def plot(plotname,nox=False,**kwargs):
+def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 
 	"""
 	Run a plotting routine.
 	"""
 
-	fns = []
-	for (dirpath, dirnames, filenames) in os.walk('./'): 
-		fns.extend([dirpath+'/'+fn for fn in filenames])
-	search = filter(lambda x:re.match('^\.\/[^omni].+\/plot-%s\.py$'%plotname,x),fns)
-	if len(search)!=1: status('unclear search for %s: %s'%(plotname,str(search)))
-	else: 
-		status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
-		os.system('python -i '+search[0]+(' nox' if nox else '')+' "%s"'%kwargs)
+	from copy import deepcopy
+	if plotname == None:
+		from base.workspace import Workspace
+		if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
+		if specfile == None: spec_fn = unpacker(conf_paths,'paths')['specs_file']
+		#---! note that this code is repeated in multiple places and needs consolidation
+		#---! locations include workspace.py,action and store.py,plotload
+
+		#---load the yaml specifications file
+		if type(spec_fn)==str: spec_fn = [spec_fn]
+		raw_specs = ''
+		for sfn in spec_fn: 
+			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
+		specs = yaml.load(raw_specs)
+		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
+			self.paths['specs_file'])
+		#---merge automatic calculations here
+		if 'autocalcs' in specs:
+			for key,val in specs['autocalcs'].items():
+				if key in specs['calculations']: 
+					raise Exception('\n[ERROR] redundant names in calculations and autocalcs: %s'%key+
+						", which is populated with django so check calculator.Calculation")
+				else: specs['calculations'][key] = deepcopy(val)
+		if 'autoplots' in specs:
+			for key,val in specs['autoplots'].items():
+				if key in specs['plots']: 
+					raise Exception('\n[ERROR] redundant names in plots and autoplots: %s'%key+
+						", which is populated with django so check calculator.Calculation")
+				else: specs['plots'][key] = deepcopy(val)
+		work = Workspace(workspace,previous=False)
+		plotnames = specs['plots'].keys()
+	else: plotnames = [plotname]
+
+	for pname in plotnames:
+		fns = []
+		for (dirpath, dirnames, filenames) in os.walk('./'): 
+			fns.extend([dirpath+'/'+fn for fn in filenames])
+		search = filter(lambda x:re.match('^\.\/[^omni].+\/plot-%s\.py$'%pname,x),fns)
+		if len(search)!=1: status('unclear search for %s: %s'%(pname,str(search)))
+		else: 
+			if plotname==None: 
+				cmd = 'python '+search[0]+' nox quit=True '+' "%s"'%str(kwargs)+' &> log'
+			else: 
+				status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
+				cmd = "python -i "+search[0]+(' nox' if nox else '')+' "%s"'%str(kwargs)
+			status('calling: "%s"'%cmd,tag='status')
+			os.system(cmd)
+
 
 def tests(specfile=None,nox=False):
 

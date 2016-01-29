@@ -73,7 +73,16 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 	raw_specs = ''
 	for sfn in specfile: 
 		with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
-	plotspecs = yaml.load(raw_specs)['plots'][plotname]
+	specs = yaml.load(raw_specs)
+
+	#---merge automatic plots here
+	if 'autoplots' in specs:
+		for key,val in specs['autoplots'].items():
+			if key in specs['plots']: 
+				raise Exception('\n[ERROR] redundant names in plots and autoplots: %s'%key+
+					", which is populated with django so check calculator.Calculation")
+			else: specs['plots'][key] = deepcopy(val)
+	plotspecs = specs['plots'][plotname]
 
 	#---load the calculation from the workspace
 	calcnames = plotspecs['calculation']

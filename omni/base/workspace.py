@@ -604,6 +604,22 @@ class Workspace():
 		specs = yaml.load(raw_specs)
 		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
 			self.paths['specs_file'])
+
+		"""
+		For compatibility with django we merge the autocalcs dictionary with the calculations dictionary.
+		The former is populated by django from the Calculation model in calculator.
+		The latter can be populated by the user but both dictionaries must have unique keys.
+		We enforce uniqueness via error message below.
+		"""
+
+		#---merge automatic calculations here
+		if 'autocalcs' in specs:
+			for key,val in specs['autocalcs'].items():
+				if key in specs['calculations']: 
+					raise Exception('\n[ERROR] redundant names in calculations and autocalcs: %s'%key+
+						", which is populated with django so check calculator.Calculation")
+				else: specs['calculations'][key] = deepcopy(val)
+
 		#---either simulations are placed at the root of the YAML file or in the slices dictionary
 		sns = [key for key in specs if re.match(self.datahead['toc']['regex'][0],key)]
 		if 'slices' in specs:
