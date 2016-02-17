@@ -31,14 +31,14 @@ def edrcheck(fn,debug=False):
 	return start,end
 
 def slice_trajectory(start,end,skip,seq_time_fn,outkey='TMP',
-	path=None,rootdir='',postdir='',groupfn='',pbc=None):
+	path=None,rootdir='',postdir='',groupfn='',pbc=None,suffix='xtc',toc='toc'):
 
 	"""
 	Make a trajectory slice.
 	"""
 
-	#---we enforce ps-denominated time stamps here
-	start,end,skip = int(start),int(end),int(skip)
+	#---relaxing enforcement of ps-denominated time stamps to allow for very small skips
+	if 0: start,end,skip = int(start),int(end),int(skip)
 
 	chop = []
 	seq = seq_time_fn
@@ -53,20 +53,19 @@ def slice_trajectory(start,end,skip,seq_time_fn,outkey='TMP',
 			(start <= span[0] and end >= span[1])]):
 			t0 = int(span[0]/float(skip)+1)*float(skip)
 			chop.append((key,t0))
-
 	#---make the XTC files
 	cmdlist = []
 	for num,val in enumerate(chop):
 		sn,sub,fn = val[0]
 		t0 = val[1]
-		full = rootdir+path(sn,sub,fn)
-		full = rootdir+path(sn,sub,fn)
+		full = rootdir+path(sn,sub,fn,toc=toc)
+		full = rootdir+path(sn,sub,fn,toc=toc)
 		#---assume each XTC has a corresponding TPR
 		tpr = full[:-3]+'tpr'
 		if not os.path.isfile(tpr): raise Exception('[ERROR] cannot find TPR for %s'%full)
 		#---we deal with XTC files only
 		tail = ' -b %d -e %d -dt %d -s %s -f %s -o %s -n %s'%(
-			t0 if t0>start else start,end,skip,tpr,full,'trjconv%d.xtc'%num,groupfn)
+			t0 if t0>start else start,end,skip,tpr,full,'trjconv%d.%s'%(num,suffix),groupfn)
 		if pbc != None: tail = tail + ' -pbc %s'%pbc
 		cmdlist.append(gmxpaths['trjconv']+tail)
 
@@ -91,13 +90,13 @@ def slice_trajectory(start,end,skip,seq_time_fn,outkey='TMP',
 	for key in range(len(chop)):
 		with open(postdir+'/log-trjconv-%d'%key,'r') as fp: lines = fp.readlines()
 		if any(filter(lambda x:re.search('(F|f)atal error',x),lines)): valid_parts.remove(key)
-	call(gmxpaths['trjcat']+' -o %s.xtc -f '%outkey+
-		' '.join(['trjconv%d.xtc'%key for key in valid_parts]),
+	call(gmxpaths['trjcat']+' -o %s.%s -f '%(outkey,suffix)+
+		' '.join(['trjconv%d.%s'%(key,suffix) for key in valid_parts]),
 		cwd=postdir,logfile='log-trjcat-%s'%outkey)
 		
 	#---delete extraneous files
 	for key in valid_parts:
-		os.remove(postdir+'/trjconv%d.xtc'%key)
+		os.remove(postdir+'/trjconv%d.%s'%(key,suffix))
 		os.remove(postdir+'/log-trjconv-%d'%key)
 	os.remove(postdir+'/log-trjcat-%s'%outkey)
 	os.remove(postdir+'log-trjconv-frame')

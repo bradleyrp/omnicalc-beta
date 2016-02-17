@@ -103,7 +103,9 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 		elif 'group' in work.calc[calcname]: group = work.calc[calcname]['group']
 		else: group = None
 		#---get the collection from either plotspecs or the upstream calculation
-		if 'collections' in plotspecs: collections = plotspecs['collections']
+		if 'collections' in plotspecs: 
+			collections = plotspecs['collections']
+			if type(collections)==str: collections = [collections]
 		else: collections = calc['collections']
 		sns = flatten([work.vars['collections'][c] for c in collections])
 
@@ -120,6 +122,7 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 				status(sn,tag='load',i=snum,looplen=len(sns))
 				#---combine slices here if necessary
 				"""
+				#---! REMOVE THE FOLLOWING?
 				#---the following code violates dry with computer.py
 				import pdb;pdb.set_trace()
 				for slicenum,spec in enumerate(specs):
@@ -145,6 +148,7 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 						data[sn][outkey] = os.path.basename(fn)[:-4]+'dat'
 				"""
 				#---slices in plotspecs or lookup from variables with plus-syntax
+				#---! need to allow blank slices here so that the machine looks to calcs to get them
 				if 'slices' in plotspecs and not re.match('^\+',plotspecs['slices']): 
 					sl = work.slices[sn][plotspecs['slices']]['all' if not group else group]
 				elif 'slices' in plotspecs: 

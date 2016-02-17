@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os,sys,re,inspect,subprocess,time
+import traceback
 
 def flatten(k):
 	while any([type(j)==list for j in k]): k = [i for j in k for i in j] 
@@ -169,3 +170,12 @@ def framelooper(total,start=None,text='frame'):
 		status(text,i=fr,looplen=total,tag='parallel',start=start)
 		yield fr
 
+def tracer(e):
+
+	"""
+	Print a traceback and continue. Use this with exceptions.
+	"""
+
+	s = traceback.format_exc()
+	print "[TRACE] > "+"\n[TRACE] > ".join(s.split('\n'))
+	print "[ERROR] failed to make slice"
