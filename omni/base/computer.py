@@ -37,8 +37,10 @@ def computer(function,**kwargs):
 			if slice_name not in work.slices[sn]:
 				raise Exception('\n[ERROR] the slices yaml file is missing a slice named "%s" for simulation "%s"'%
 					(slice_name,sn))
-			if work.slices[sn][slice_name][group]['missing_frame_percent']>work.missing_frame_tolerance:
-				status('upstream slice failure: %s,%s,%s'%(sn,slice_name,group),tag='warning')
+			mfp = work.slices[sn][slice_name][group]['missing_frame_percent']
+			if mfp>work.missing_frame_tolerance:
+				status('upstream slice failure: %s,%s,%s missing_frame_percent=%.1f'%(
+					sn,slice_name,group,mfp),tag='warning')
 				continue
 			new_job['grofile'] = work.postdir+work.slices[sn][slice_name][group]['gro']
 			new_job['trajfile'] = work.postdir+work.slices[sn][slice_name][group]['xtc']
@@ -85,8 +87,8 @@ def computer(function,**kwargs):
 					#---! moved the following block left recently
 					fn = work.select_postdata(fn_base,spec)
 					if not fn: 
+						print '[ERROR] missing %s'%fn
 						import pdb;pdb.set_trace()
-						raise Exception('[ERROR] missing %s'%fn)
 					outkey = key if len(specs)==1 else '%s%d'%(key,slicenum)
 					#---before each calculation the master loop loads the filename stored here
 					data[sn][outkey] = os.path.basename(fn)[:-4]+'dat'
