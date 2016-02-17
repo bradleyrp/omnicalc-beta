@@ -8,7 +8,7 @@ from base.tools import unpacker,path_expand,status,argsort,unescape,tupleflat
 from base.tools import delve,asciitree,catalog,status,unique,flatten
 from base.gromacs_interface import edrcheck,slice_trajectory,machine_name
 from base.hypothesis import hypothesis
-from base.computer import computer
+from base.computer import computer,computer_mesoscale
 from base.timer import checktime
 from base.store import picturefind
 from copy import deepcopy
@@ -725,7 +725,11 @@ class Workspace():
 						sys.path.insert(0,os.path.dirname(search[0]))
 						function = unpacker(search[0],calcname)
 						status('computing %s'%calcname,tag='loop')
-						computer(function,calc=calc,workspace=self,dry=dry)
+						#---any simulations with meta that specifies a boolean mesoscale get diverted
+						if any(['mesoscale' in self.meta[k] and self.meta[k]['mesoscale'] 
+							for c in calc['collections'] for k in self.vars['collections'][c]]):
+							computer_mesoscale(function,workspace=self,dry=dry,specs=specs)
+						else: computer(function,calc=calc,workspace=self,dry=dry)
 						self.save()
 					checktime()
 		self.save()

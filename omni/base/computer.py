@@ -174,3 +174,14 @@ def computer(function,**kwargs):
 
 	#---no modifications to work so no save
 	return
+
+def computer_mesoscale(function,**kwargs):
+
+	"""
+	Run a computation on a mesoscale simulation.
+	"""
+
+	work = kwargs['workspace']
+
+	import pdb;pdb.set_trace()
+
