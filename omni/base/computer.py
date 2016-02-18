@@ -59,6 +59,7 @@ def computer(function,**kwargs):
 					specs = [options[ss] for r,v in whittles for ss,s in enumerate(stubs) 
 						if delve(s['specs'],*r)==v]
 				if len(specs)!=1 and 'loop' not in upspecs['slice_name']: 
+					import pdb;pdb.set_trace()
 					raise Exception('[ERROR] redundant upstream selection %s'%str(select))
 				#---if there are multiple slices
 				#---! note that we expect that if slice_names is a list it will be ordered here too

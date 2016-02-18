@@ -433,6 +433,7 @@ class Workspace():
 		#---get all paths to a loop
 		nonterm_paths = list([tuple(j) for j in set([tuple(i[:i.index('loop')+1]) 
 			for i,j in catalog(details_trim) if 'loop' in i[:-1]])])
+		#---some loops end in a list instead of a sub-dictionary
 		nonterm_paths_list = list([tuple(j) for j in set([tuple(i[:i.index('loop')+1]) 
 			for i,j in catalog(details_trim) if i[-1]=='loop'])])
 		#---for each non-terminal path we save everything below and replace it with a key
@@ -457,9 +458,13 @@ class Workspace():
 		#---loops over lists (instead of dictionaries) carry along the entire loop which most be removed
 		for ii,i in enumerate(nonterm_paths_list):
 			for nc in new_calcs: 
-				pivot = delve(nc,*i[:-2]) if len(i)>2 else nc
-				val = delve(nc,*i[:-1])[i[-2]]
-				pivot[i[-2]] = val
+				#---! this section is supposed to excise the redundant "loop" list if it still exists
+				#---! however the PPI project had calculation metadata that didn't require it so we just try
+				try:
+					pivot = delve(nc,*i[:-2]) if len(i)>2 else nc
+					val = delve(nc,*i[:-1])[i[-2]]
+					pivot[i[-2]] = val
+				except: pass
 		return new_calcs if not return_stubs else (new_calcs,new_calcs_stubs)
 
 	#---CREATE GROUPS
@@ -673,6 +678,7 @@ class Workspace():
 			if not calculation_name is None: calckeys = [calculation_name]
 			for calcname in calckeys:
 				details = specs['calculations'][calcname]
+				status('checking calculation %s'%calcname,tag='status')
 				new_calcs = self.interpret_specs(details)
 				#---perform calculations
 				for calc in new_calcs:
