@@ -34,6 +34,14 @@ def computer(function,**kwargs):
 		new_job = {'sn':sn,'slice_name':slice_name,'group':group}
 		if incoming_type == 'simulation':
 			#---prepare combinations in a dictionary
+			if slice_name not in work.slices[sn]:
+				raise Exception('\n[ERROR] the slices yaml file is missing a slice named "%s" for simulation "%s"'%
+					(slice_name,sn))
+			mfp = work.slices[sn][slice_name][group]['missing_frame_percent']
+			if mfp>work.missing_frame_tolerance:
+				status('upstream slice failure: %s,%s,%s missing_frame_percent=%.1f'%(
+					sn,slice_name,group,mfp),tag='warning')
+				continue
 			new_job['grofile'] = work.postdir+work.slices[sn][slice_name][group]['gro']
 			new_job['trajfile'] = work.postdir+work.slices[sn][slice_name][group]['xtc']
 		if 'specs' not in calc: calc['specs'] = ''
@@ -80,8 +88,8 @@ def computer(function,**kwargs):
 					#---! moved the following block left recently
 					fn = work.select_postdata(fn_base,spec)
 					if not fn: 
+						print '[ERROR] missing %s'%fn
 						import pdb;pdb.set_trace()
-						raise Exception('[ERROR] missing %s'%fn)
 					outkey = key if len(specs)==1 else '%s%d'%(key,slicenum)
 					#---before each calculation the master loop loads the filename stored here
 					data[sn][outkey] = os.path.basename(fn)[:-4]+'dat'
@@ -169,3 +177,14 @@ def computer(function,**kwargs):
 
 	#---no modifications to work so no save
 	return
+
+def computer_mesoscale(function,**kwargs):
+
+	"""
+	Run a computation on a mesoscale simulation.
+	"""
+
+	work = kwargs['workspace']
+
+	import pdb;pdb.set_trace()
+

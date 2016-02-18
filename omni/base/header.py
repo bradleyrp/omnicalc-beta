@@ -47,3 +47,25 @@ def workspace(func):
 		kwargs['workspace'] = work
 		return func(*args,**kwargs)
 	return mod
+
+def incoming_kwargs_string():
+
+	"""
+	Controller passes kwargs to plot script as a string.
+	This function finds the dictionary and returns it.
+	"""
+
+	kwargs = {}
+	for a in sys.argv:
+		try: kwargs = dict(eval(a))
+		except: pass
+	return kwargs
+
+def doneplot(): 
+
+	"""
+	After plotting, exit if kwargs['quit'].
+	"""
+
+	if 'kwargs' in globals() and 'quit' in globals()['kwargs'] and globals()['kwargs']['quit']:
+		os._exit(1)

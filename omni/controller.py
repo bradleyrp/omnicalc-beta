@@ -44,21 +44,75 @@ def look(workspace=None,nox=False):
 	"""
 
 	os.system('python -i ./omni/base/header.py'+(' nox' if nox else ''))
+
+def refresh(specfile=None,workspace=None,autoreload=False,dry=False):
+
+	"""
+	If you have new data or more data (i.e. more XTC files or longer trajectories) you must
+	run refresh in order to add those files to the tables of contents.
+	"""
+
+	from base.workspace import Workspace
+	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
+	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
+	work = Workspace(workspace,previous=False,autoreload=autoreload)
+	work.bootstrap()
+	work.save()
 	
-def plot(plotname,nox=False):
+def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 
 	"""
 	Run a plotting routine.
 	"""
 
-	fns = []
-	for (dirpath, dirnames, filenames) in os.walk('./'): 
-		fns.extend([dirpath+'/'+fn for fn in filenames])
-	search = filter(lambda x:re.match('^\.\/[^omni].+\/plot-%s\.py$'%plotname,x),fns)
-	if len(search)!=1: status('unclear search for %s: %s'%(plotname,str(search)))
-	else: 
-		status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
-		os.system('python -i '+search[0]+(' nox' if nox else ''))
+	from copy import deepcopy
+	if plotname == None:
+		from base.workspace import Workspace
+		if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
+		if specfile == None: spec_fn = unpacker(conf_paths,'paths')['specs_file']
+		#---! note that this code is repeated in multiple places and needs consolidation
+		#---! locations include workspace.py,action and store.py,plotload
+
+		#---load the yaml specifications file
+		if type(spec_fn)==str: spec_fn = [spec_fn]
+		raw_specs = ''
+		for sfn in spec_fn: 
+			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
+		specs = yaml.load(raw_specs)
+		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
+			self.paths['specs_file'])
+		#---merge automatic calculations here
+		if 'autocalcs' in specs:
+			for key,val in specs['autocalcs'].items():
+				if key in specs['calculations']: 
+					raise Exception('\n[ERROR] redundant names in calculations and autocalcs: %s'%key+
+						", which is populated with django so check calculator.Calculation")
+				else: specs['calculations'][key] = deepcopy(val)
+		if 'autoplots' in specs:
+			for key,val in specs['autoplots'].items():
+				if key in specs['plots']: 
+					raise Exception('\n[ERROR] redundant names in plots and autoplots: %s'%key+
+						", which is populated with django so check calculator.Calculation")
+				else: specs['plots'][key] = deepcopy(val)
+		work = Workspace(workspace,previous=False)
+		plotnames = specs['plots'].keys()
+	else: plotnames = [plotname]
+
+	for pname in plotnames:
+		fns = []
+		for (dirpath, dirnames, filenames) in os.walk('./'): 
+			fns.extend([dirpath+'/'+fn for fn in filenames])
+		search = filter(lambda x:re.match('^\.\/[^omni].+\/plot-%s\.py$'%pname,x),fns)
+		if len(search)!=1: status('unclear search for %s: %s'%(pname,str(search)))
+		else: 
+			if plotname==None: 
+				cmd = 'python '+search[0]+' nox quit=True '+' "%s"'%str(kwargs)+' &> log'
+			else: 
+				status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
+				cmd = "python -i "+search[0]+(' nox' if nox else '')+' "%s"'%str(kwargs)
+			status('calling: "%s"'%cmd,tag='status')
+			os.system(cmd)
+
 
 def tests(specfile=None,nox=False):
 
@@ -73,6 +127,23 @@ def tests(specfile=None,nox=False):
 	for name in test_plot_names:
 		print '[TEST SUITE] plotting %s'%name
 		os.system('python calcs/plot-'+name+'.py'+(' nox' if nox else ''))
+
+def export_to_factory(project_name,project_location,specfile=None,workspace=None):
+
+	"""
+	Export the simulation data from the toc to the factory database.
+	Users should not run this.
+	"""
+
+	sys.path.append(project_location)
+	os.environ.setdefault("DJANGO_SETTINGS_MODULE",project_name+".settings")
+	from simulator import models
+	from base.workspace import Workspace
+	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
+	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
+	work = Workspace(workspace,previous=False)
+	for key in work.toc:
+		models.Simulation(name=key,program="protein",code=key).save()
 
 #---INTERFACE
 #-------------------------------------------------------------------------------------------------------------

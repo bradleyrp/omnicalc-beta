@@ -5,14 +5,18 @@ import yaml
 import pickle,json,copy,glob
 from constants import conf_paths,conf_gromacs
 from base.tools import unpacker,path_expand,status,argsort,unescape,tupleflat
-from base.tools import delve,asciitree,catalog,status,unique,flatten
+from base.tools import delve,asciitree,catalog,status,unique,flatten,tracer
 from base.gromacs_interface import edrcheck,slice_trajectory,machine_name
 from base.hypothesis import hypothesis
-from base.computer import computer
+from base.computer import computer,computer_mesoscale
 from base.timer import checktime
 from base.store import picturefind
 from copy import deepcopy
 import MDAnalysis
+
+#---suppress warnings (usually from MDAnalysis)
+import warnings
+warnings.filterwarnings("ignore")
 
 #---joblib and multiprocessing modules require all functions to be registered in __main__
 for fn in glob.glob('calcs/codes/*.py'): execfile(fn)
@@ -40,6 +44,8 @@ class Workspace():
 		self.parse_specs = unpacker(conf_paths,'parse_specs')
 		self.machine = unpacker(conf_gromacs,'machine_configuration')[machine_name]
 		self.nprocs = self.machine['nprocs']
+		#---throw an error if you are missing more than 20% of the data
+		self.missing_frame_tolerance = 0.2
 		self.rootdir = os.path.join(path_expand(self.paths['data_spots'][0]),'')
 		self.postdir = os.path.join(path_expand(self.paths['post_data_spot']),'')
 		self.plotdir = os.path.join(path_expand(self.paths['post_plot_spot']),'')
@@ -113,15 +119,22 @@ class Workspace():
 		#---ignore other tocs for now
 		if 'toc' not in self.datahead: raise Exception("[ERROR] need a 'toc' inside parse_specs")
 		
-		#---parse the tree for the primary toc
+		#---parse the tree for different tables-of-contents
+		for key in [i for i in self.parse_specs if i not in ['toc','toc_structures','shortname']]: 
+			self.treeparser(key)
+		#---note that toc and toc_structures are protected keys, referring to XTC and GRO/PDB files
 		self.treeparser('toc')
-		self.treeparser('toc_structures',sort=False)
 		self.treeparser_xtc_edr('toc')
-
+		self.treeparser('toc_structures',sort=False)
+		
 		#---data are stored in dictionaries by simulation name
 		self.post = dict([(sn,{}) for sn in self.toc.keys()])
 		self.groups = dict([(sn,{}) for sn in self.toc.keys()])
 		self.slices = dict([(sn,{}) for sn in self.toc.keys()])
+		#---! hack for TRR
+		for extra_toc in self.datahead:
+			for sn in self.__dict__[extra_toc]:
+				if sn not in self.groups: self.groups[sn] = {}
 		self.save()
 
 	def verify(self,scrub=False):
@@ -389,15 +402,18 @@ class Workspace():
 		Also used by store.plot_header to identify the correct data to unpack.
 		"""
 
-		for specfn in glob.glob(self.postdir+fn_base+'*.spec'):
+		candidates = glob.glob(self.postdir+fn_base+'*.spec')
+		if len(candidates)==1: return candidates[0]
+		for specfn in candidates:
 			with open(specfn,'r') as fp: attrs = json.loads(fp.read())
-			if attrs=={} or attrs==calc['specs']: return specfn
+			if attrs=={} or ('specs' in calc and attrs==calc['specs']): return specfn
 			#---if specs are not identical we compare the ones that are and pass if they are equal
 			chop = deepcopy(attrs)
 			extra_keys = [key for key in chop if key not in calc['specs']]
 			for key in extra_keys: del chop[key]
 			if calc['specs']==chop: return specfn
 		if debug: 
+			print "[ERROR] select_postdata failed to find the right data\n[DEBUG] welcome"
 			import pdb;pdb.set_trace()
 		return None
 		
@@ -526,9 +542,21 @@ class Workspace():
 
 		subs = self.sort_steps(sn)
 		seq_key_fn = [((sn,sub,fn),self.fullpath(sn,sub,fn)) for sub in subs for fn in self.toc[sn][sub]]
-		seq_time_fn = [(self.edr_times[self.xtc_files.index(fn)],key) for key,fn in seq_key_fn
-			if not strict or (None not in self.edr_times[self.xtc_files.index(fn)])]
+		#---note that self.edr_times is written according to the XTC files
+		#---...if you use an alternate parse_specs in paths.py e.g. for TRR files we must substitute
+		seq_time_fn = [(self.edr_times[self.xtc_files.index(fn)],key) 
+			for key,fn in seq_key_fn if not strict or (None not in 
+			self.edr_times[self.xtc_files.index(fn)])]
 		return seq_time_fn
+		
+	def get_timeseq_range(self,sn):
+	
+		"""
+		Return a tuple of the minimum and maximum timestamps for a particular simulation.
+		"""
+	
+		return (min([i[0][0] for i in self.get_timeseq(sn)]),
+			max([i[0][1] for i in self.get_timeseq(sn)]))
 
 	def create_slice(self,**kwargs):
 
@@ -543,11 +571,18 @@ class Workspace():
 		skip = kwargs['skip']
 		group = kwargs['group']
 		slice_name = kwargs['slice_name']
+		suffix = kwargs['suffix'] if 'suffix' in kwargs else 'xtc'
+		#---two possible toc types specified in parse_specs (XTC vs TRR)
+		toc = 'toc_trr' if suffix=='trr' else 'toc'
 		pbc = kwargs['pbc'] if 'pbc' in kwargs else None
 		prefix='v' if self.shortname(sn).isdigit() else ''
 		outkey = '%s%s.%d-%d-%d.%s%s'%(prefix,self.shortname(sn),start,end,skip,
 			group,'' if pbc==None else '.pbc%s'%pbc)
-		grofile,trajfile = outkey+'.gro',outkey+'.xtc'
+		#---allow sub-ps sampling
+		if type(skip)==float: 
+			outkey = '%s%s.%d-%d-%g.%s%s'%(prefix,self.shortname(sn),start,end,skip,
+				group,'' if pbc==None else '.pbc%s'%pbc)
+		grofile,trajfile = outkey+'.gro',outkey+'.%s'%suffix
 		both_there = all([os.path.isfile(self.postdir+fn) for fn in [grofile,trajfile]])
 		if both_there and slice_name in self.slices[sn] and group in self.slices[sn][slice_name]: return
 		if not both_there or not all([self.confirm_file(self.postdir+fn) for fn in [grofile,trajfile]]):
@@ -555,13 +590,21 @@ class Workspace():
 			if not dry:
 				#---slice is not there or not confirmed so we make a new one here
 				seq_time_fn = self.get_timeseq(sn,strict=False)
-				slice_trajectory(start,end,skip,seq_time_fn,
+				try: slice_trajectory(start,end,skip,seq_time_fn,
 					groupfn=self.postdir+self.groups[sn][group]['fn'],outkey=outkey,pbc=pbc,
-					path=self.fullpath,rootdir=self.rootdir,postdir=self.postdir)
+					path=self.fullpath,rootdir=self.rootdir,postdir=self.postdir,suffix=suffix,toc=toc)
+				except Exception as e:
+					tracer(e)
+					if slice_name not in self.slices[sn]: self.slices[sn][slice_name] = {}
+					self.slices[sn][slice_name][group] = {'start':start,'end':end,'skip':skip,
+						'group':group,'pbc':pbc,'verified':False,'filekey':outkey,
+						'gro':grofile,'xtc':trajfile,'missing_frame_percent':100.}
+					return
 		print '[STATUS] checking timestamps of slice: %s'%outkey
 		#---slice is made or preexisting and now we validate
 		timeseries = self.slice_timeseries(self.postdir+grofile,self.postdir+trajfile)
 		import numpy as np
+		missing_frame_percent = 1.-len(np.arange(start,end+skip,skip))/float(len(timeseries))
 		if len(timeseries)!=len(np.arange(start,end+skip,skip)): verified = False
 		else:
 			try: verified = all(np.array(timeseries).astype(float)==
@@ -571,7 +614,7 @@ class Workspace():
 		if slice_name not in self.slices[sn]: self.slices[sn][slice_name] = {}
 		self.slices[sn][slice_name][group] = {'start':start,'end':end,'skip':skip,
 			'group':group,'pbc':pbc,'verified':verified,'timeseries':timeseries,'filekey':outkey,
-			'gro':grofile,'xtc':trajfile}
+			'gro':grofile,'xtc':trajfile,'missing_frame_percent':missing_frame_percent}
 			
 	#---READ SPECIFICATIONS FILES
 
@@ -583,10 +626,29 @@ class Workspace():
 
 		status('parsing specs file',tag='status')
 		#---load the yaml specifications file
-		with open(spec_fn,'r') as fp: raw_specs = fp.read()
+		if type(spec_fn)==str: spec_fn = [spec_fn]
+		raw_specs = ''
+		for sfn in spec_fn: 
+			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
 		specs = yaml.load(raw_specs)
 		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
 			self.paths['specs_file'])
+
+		"""
+		For compatibility with django we merge the autocalcs dictionary with the calculations dictionary.
+		The former is populated by django from the Calculation model in calculator.
+		The latter can be populated by the user but both dictionaries must have unique keys.
+		We enforce uniqueness via error message below.
+		"""
+
+		#---merge automatic calculations here
+		if 'autocalcs' in specs:
+			for key,val in specs['autocalcs'].items():
+				if key in specs['calculations']: 
+					raise Exception('\n[ERROR] redundant names in calculations and autocalcs: %s'%key+
+						", which is populated with django so check calculator.Calculation")
+				else: specs['calculations'][key] = deepcopy(val)
+
 		#---either simulations are placed at the root of the YAML file or in the slices dictionary
 		sns = [key for key in specs if re.match(self.datahead['toc']['regex'][0],key)]
 		if 'slices' in specs:
@@ -631,6 +693,7 @@ class Workspace():
 						kwargs['group'] = group
 						if 'pbc' in details: kwargs['pbc'] = details['pbc']
 						if dry: kwargs['dry'] = True
+						if 'suffix' in details: kwargs['suffix'] = details['suffix']
 						self.create_slice(**kwargs)
 						self.save(quiet=True)
 				root.pop('slices')
@@ -693,7 +756,11 @@ class Workspace():
 						sys.path.insert(0,os.path.dirname(search[0]))
 						function = unpacker(search[0],calcname)
 						status('computing %s'%calcname,tag='loop')
-						computer(function,calc=calc,workspace=self,dry=dry)
+						#---any simulations with meta that specifies a boolean mesoscale get diverted
+						if any(['mesoscale' in self.meta[k] and self.meta[k]['mesoscale'] 
+							for c in calc['collections'] for k in self.vars['collections'][c]]):
+							computer_mesoscale(function,workspace=self,dry=dry,specs=specs)
+						else: computer(function,calc=calc,workspace=self,dry=dry)
 						self.save()
 					checktime()
 		self.save()
