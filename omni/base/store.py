@@ -31,12 +31,13 @@ def store(obj,name,path,attrs=None,print_types=False,verbose=True):
 	if verbose: status('[WRITING] '+path+'/'+name)
 	fobj.close()
 
-def load(name,path,verbose=False,filename=False,exclude_slice_source=False):
+def load(name,path=None,verbose=False,filename=False,exclude_slice_source=False):
 
 	"""
 	Load an h5py datastore.
 	"""
 
+	if not path: path,name = os.path.dirname(name),os.path.basename(name)
 	path = os.path.abspath(os.path.expanduser(path))
 	if not os.path.isfile(path+'/'+name): 
 		raise Exception('[ERROR] failed to load '+path+'/'+name)
@@ -120,33 +121,6 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 			#---loop over simulations 
 			for snum,sn in enumerate(sns):
 				status(sn,tag='load',i=snum,looplen=len(sns))
-				#---combine slices here if necessary
-				"""
-				#---! REMOVE THE FOLLOWING?
-				#---the following code violates dry with computer.py
-				import pdb;pdb.set_trace()
-				for slicenum,spec in enumerate(specs):
-					#---if the upstream calculation has a group then use it in the filename
-					if not group:
-						if 'group' in work.calc[key]: upgroup = work.calc[key]['group']
-						else: upgroup = None
-					else: upgroup = group
-					if not upgroup: 
-						sl = work.slices[sn][spec['slice_name']]
-						fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',
-							work.slices[sn][upspecs['slice_name']]['all']['filekey']
-							)[0]+'.%s'%key
-					else: 
-						sl = work.slices[sn][spec['slice_name']][upgroup]
-						fn_base = '%s.%s'%(sl['filekey'],key)
-						fn = work.select_postdata(fn_base,spec)
-						if not fn: 
-							import pdb;pdb.set_trace()
-							raise Exception('[ERROR] missing %s'%fn)
-						outkey = key if len(specs)==1 else '%s%d'%(key,slicenum)
-						#---before each calculation the master loop loads the filename stored here
-						data[sn][outkey] = os.path.basename(fn)[:-4]+'dat'
-				"""
 				#---slices in plotspecs or lookup from variables with plus-syntax
 				#---! need to allow blank slices here so that the machine looks to calcs to get them
 				if 'slices' in plotspecs and not re.match('^\+',plotspecs['slices']): 

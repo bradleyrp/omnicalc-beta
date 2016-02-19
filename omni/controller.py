@@ -97,7 +97,7 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 		work = Workspace(workspace,previous=False)
 		plotnames = specs['plots'].keys()
 	else: plotnames = [plotname]
-
+	#---for each desired plot type
 	for pname in plotnames:
 		fns = []
 		for (dirpath, dirnames, filenames) in os.walk('./'): 
@@ -112,7 +112,6 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 				cmd = "python -i "+search[0]+(' nox' if nox else '')+' "%s"'%str(kwargs)
 			status('calling: "%s"'%cmd,tag='status')
 			os.system(cmd)
-
 
 def tests(specfile=None,nox=False):
 
@@ -144,6 +143,20 @@ def export_to_factory(project_name,project_location,specfile=None,workspace=None
 	work = Workspace(workspace,previous=False)
 	for key in work.toc:
 		models.Simulation(name=key,program="protein",code=key).save()
+
+def pipeline(script):
+
+	"""
+	DEVELOPMENT
+	Method for consolidating many features of the workspace in one calculation/plot.
+	Initially developed for making movies.
+	"""
+
+	#---drop into the pipeline code but load the header first
+	script_fn = "./calcs/pipeline-%s.py"%script
+	print "[STATUS] starting pipeline via %s"%script_fn
+	if not os.path.isfile(script_fn): raise Exception("[ERROR] cannot find "+script_fn)
+	os.system('python -i -c \'execfile("./omni/base/header.py");execfile("%s")\''%script_fn)
 
 #---INTERFACE
 #-------------------------------------------------------------------------------------------------------------
