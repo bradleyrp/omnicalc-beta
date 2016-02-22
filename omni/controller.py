@@ -144,7 +144,7 @@ def export_to_factory(project_name,project_location,specfile=None,workspace=None
 	for key in work.toc:
 		models.Simulation(name=key,program="protein",code=key).save()
 
-def pipeline(script):
+def pipeline(script,nox=False):
 
 	"""
 	DEVELOPMENT
@@ -156,7 +156,8 @@ def pipeline(script):
 	script_fn = "./calcs/pipeline-%s.py"%script
 	print "[STATUS] starting pipeline via %s"%script_fn
 	if not os.path.isfile(script_fn): raise Exception("[ERROR] cannot find "+script_fn)
-	os.system('python -i -c \'execfile("./omni/base/header.py");execfile("%s")\''%script_fn)
+	extra_args = "" if not nox else "import os,sys;sys.argv.append(\"nox\");"
+	os.system('python -i -c \'%sexecfile("./omni/base/header.py");execfile("%s")\''%(extra_args,script_fn))
 
 #---INTERFACE
 #-------------------------------------------------------------------------------------------------------------

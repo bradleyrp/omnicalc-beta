@@ -16,7 +16,7 @@ TARGETS := $(shell perl -n -e '@parts = /^def\s+[a-z,_]+/g; $$\ = "\n"; print fo
 
 #---collect arguments
 RUN_ARGS_UNFILTER := $(wordlist 1,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-RUN_ARGS := $(filter-out banner help,$(RUN_ARGS_UNFILTER))
+RUN_ARGS := $(filter-out banner help docs,$(RUN_ARGS_UNFILTER))
 $(eval $(RUN_ARGS):;@:)
 
 #---do not target arguments if using python
@@ -44,4 +44,12 @@ help:
 ifeq (,$(findstring push,${RUN_ARGS}))
 	@echo -n "[STATUS] printing readme: "
 	tail -n +7 omni/readme.md
+endif
+
+#---redirect docs to a custom script
+docs:
+ifeq (,$(findstring push,${RUN_ARGS}))
+	@echo -e "[STATUS] building documentation "
+	@bash omni/docs/source/boostrap_docs.sh ${RUN_ARGS} || { echo "[STATUS] fail"; exit 1; }
+	@if [ -d omni/docs/build ]; then { echo "[STATUS] done"; exit 0; } else { bash omni/docs/source/boostrap_docs.sh; } fi
 endif

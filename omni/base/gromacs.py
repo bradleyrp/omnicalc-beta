@@ -24,6 +24,7 @@ gmx4paths = {
 	'trjconv':'trjconv',
 	'trjcat':'trjcat',
 	'gmxcheck':'gmxcheck',
+	'gmxdump':'gmxdump',
 	}
 
 gmx5paths = {
@@ -37,6 +38,7 @@ gmx5paths = {
 	'trjconv':'gmx trjconv',
 	'trjcat':'trjcat',
 	'gmxcheck':'gmxcheck',
+	'gmxdump':'gmxdump',
 	}
 	
 #---SETTINGS
