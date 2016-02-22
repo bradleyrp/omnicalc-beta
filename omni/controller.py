@@ -134,7 +134,7 @@ def export_to_factory(project_name,project_location,specfile=None,workspace=None
 	Users should not run this.
 	"""
 
-	sys.path.append(project_location)
+	sys.path.insert(0,project_location)
 	os.environ.setdefault("DJANGO_SETTINGS_MODULE",project_name+".settings")
 	from simulator import models
 	from base.workspace import Workspace
