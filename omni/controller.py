@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-import os,sys,time
+import os,sys,time,shutil
 import yaml
 import re,pickle,subprocess,glob,inspect
 from base.config import bootstrap_gromacs,bootstrap_paths
 from base.constants import conf_paths,conf_gromacs
 from base.store import load
-from base.tools import unpacker,delve,status
+from base.tools import unpacker,delve,status,call
 
 #---CONFIGURE
 #-------------------------------------------------------------------------------------------------------------
@@ -158,6 +158,39 @@ def pipeline(script,nox=False):
 	if not os.path.isfile(script_fn): raise Exception("[ERROR] cannot find "+script_fn)
 	extra_args = "" if not nox else "import os,sys;sys.argv.append(\"nox\");"
 	os.system('python -i -c \'%sexecfile("./omni/base/header.py");execfile("%s")\''%(extra_args,script_fn))
+
+def docs(clean=False):
+
+	"""
+	Relocated the documentation codes here.
+	"""
+
+	docsdir = 'omni/docs/build'
+	sourcedir = 'omni/docs/source'
+
+	if clean: 
+		build_dn = 'omni/docs/build'
+		if os.path.isdir(build_dn): 
+			shutil.rmtree(build_dn)
+			print "[STATUS] cleaned docs"
+		else: print "[STATUS] no docs to clean"
+		return
+	else:
+		try: 
+			sphinx_avail = subprocess.check_call('sphinx-apidoc --version',
+				shell=True,executable='/bin/bash')
+		except: sphinx_avail = 1
+		if sphinx_avail != 0:
+			raise Exception('\n[ERROR] sphinx-apidoc is needed for documentation')
+		if not os.path.isdir(sourcedir): os.mkdir(sourcedir)
+		subprocess.check_call('sphinx-apidoc -F -o %s ./omni/'%docsdir,
+			shell=True,executable='/bin/bash')
+		shutil.copy(sourcedir+'/conf.py',docsdir+'/')
+		for fn in glob.glob(sourcedir+'/*.png'): shutil.copy(fn,docsdir+'/')
+		for fn in glob.glob(sourcedir+'/*.rst'): shutil.copy(fn,docsdir+'/')
+		subprocess.check_call('make html',shell=True,executable='/bin/bash',cwd=docsdir)
+		shutil.copy(sourcedir+'/style.css',docsdir+'/_build/html/_static/')
+		print "[STATUS] docs are ready at file://%s/omni/docs/build/_build/html/index.html"%os.getcwd()
 
 #---INTERFACE
 #-------------------------------------------------------------------------------------------------------------

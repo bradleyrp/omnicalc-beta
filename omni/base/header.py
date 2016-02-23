@@ -11,8 +11,11 @@ if 'os' not in globals():
 	import os
 #---group writeable files
 os.umask(002)
+#---if building docs we do things slightly differently
+building_docs = '/usr/bin/sphinx-build' in sys.argv
 #---only run this script from the top directory
-if not os.path.isdir('omni'): raise Exception('[ERROR] you can only use the header from the top level')
+if not os.path.isdir('omni') and not building_docs:
+	raise Exception('[ERROR] you can only use the header from the top level')
 import re,pickle,subprocess
 import yaml
 #---scripts are run via make so we have to add to the path to find dependencies
@@ -21,6 +24,7 @@ sys.path.insert(0,'./omni/')
 if 'nox' in sys.argv:
 	import matplotlib
 	matplotlib.use('Agg')
+if building_docs: sys.path.insert(0,'../../../omni')
 from base.constants import conf_paths,conf_gromacs
 from base.config import bootstrap_gromacs,bootstrap_paths
 from base.workspace import Workspace
@@ -30,7 +34,7 @@ from base.timer import checktime
 from functools import wraps
 
 #---get the active workspace
-if 'work' not in globals():
+if 'work' not in globals() and not building_docs :
 	workspace = unpacker(conf_paths,'paths')['workspace_spot']
 	work = Workspace(workspace,previous=False)
 

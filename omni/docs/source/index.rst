@@ -99,4 +99,4 @@ Codebase
 
 Most of the functions in amx sub-modules are designed to be hidden from the user. Instead, these codes document the procedures very explicitly, and these procedure codes should produce documentation for reproducing any simulation procedure while being relatively easy to read.
 
-Check out the :doc:`AMX codebase <amx>` for more details.
+Check out the :doc:`OMNI codebase <omni>` for more details.
