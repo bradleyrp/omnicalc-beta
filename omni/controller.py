@@ -207,7 +207,7 @@ def makeface(*arglist):
 		raise Exception('[ERROR] no arguments to controller')
 	aargs,kwargs = [],{}
 	arglist = list(arglist)
-	for stray in ['--','w','ws','sw']:
+	for stray in ['--','w','ws','sw','s']:
 		if stray in arglist: arglist.remove(stray)
 	funcname = arglist.pop(0)
 	#---if not configured we exit
