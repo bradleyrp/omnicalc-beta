@@ -140,9 +140,10 @@ def export_to_factory(project_name,project_location,specfile=None,workspace=None
 	from base.workspace import Workspace
 	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
 	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
-	work = Workspace(workspace,previous=False)
-	for key in work.toc:
-		models.Simulation(name=key,program="protein",code=key).save()
+	try:
+		work = Workspace(workspace,previous=False)
+		for key in work.toc: models.Simulation(name=key,program="protein",code=key).save()
+	except: print "[STATUS] nothing to export"
 
 def pipeline(script,nox=False):
 
