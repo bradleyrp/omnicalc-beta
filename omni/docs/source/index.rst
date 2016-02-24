@@ -7,7 +7,7 @@
 Concept
 =======
 
-What is omnicalc? 
+*OMNICALC* is a framework for analyzing simulations from *GROMACS*, and similar modeling 
 
 Atomistic protein simulations
 =============================
