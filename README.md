@@ -3,13 +3,7 @@
 OMNICALC
 ========
 
-The "omnicalc" codes are designed to analyze large
-biophysical simulation datasets while reducing the 
-scientific methods and bookkeeping to only a few, 
-relatively easy-to-read python codes and markup files.
-The omnicalc pipeline works well with 
-[automacs](http://github.com/bradleyrp/automacs) codes for 
-designing simulations.
+The "omnicalc" codes are designed to apply clearly-written biophysical calculations to large simulation datasets. In conjunction with "automacs" and "factory" codes, omnicalc is the end of a data pipeline which allows users to create and analyze simulations from a simple web interface. As a standalone code, omnicalc catalog GROMACS simulation data and applies a series of (possible chained) calculations to it. The codes include plotting routines and common calculations.
 
 Requires
 --------
@@ -23,7 +17,4 @@ Requires
 Installation
 ------------
 
-Download and run ``make help`` for instructions.
-Run ``make config`` to set paths. Run ``make docs`` to generate 
-documentation which explains the pipeline further
-
+Download and run ``make help`` for instructions. Run ``make config`` to set paths. Run ``make docs`` to generate documentation which explains the pipeline further.
