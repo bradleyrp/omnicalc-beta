@@ -136,6 +136,8 @@ def export_to_factory(project_name,project_location,specfile=None,workspace=None
 
 	sys.path.insert(0,project_location)
 	os.environ.setdefault("DJANGO_SETTINGS_MODULE",project_name+".settings")
+	import django
+	django.setup()
 	from simulator import models
 	from base.workspace import Workspace
 	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']

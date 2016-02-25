@@ -10,3 +10,5 @@
 !.gitignore
 *.pyc
 !README.md
+calcs/
+omni/docs/build/
