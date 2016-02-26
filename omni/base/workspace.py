@@ -40,6 +40,7 @@ class Workspace():
 		self.parse_specs = unpacker(conf_paths,'parse_specs')
 		self.machine = unpacker(conf_gromacs,'machine_configuration')[machine_name]
 		self.nprocs = self.machine['nprocs']
+		#---! need consistent rootdir behavior!
 		self.rootdir = os.path.join(path_expand(self.paths['data_spots'][0]),'')
 		self.postdir = os.path.join(path_expand(self.paths['post_data_spot']),'')
 		self.plotdir = os.path.join(path_expand(self.paths['post_plot_spot']),'')
@@ -687,8 +688,16 @@ class Workspace():
 		"""
 
 		status('parsing specs file',tag='status')
+
 		#---load the yaml specifications file
-		with open(spec_fn,'r') as fp: raw_specs = fp.read()
+		if 0:
+			with open(spec_fn,'r') as fp: raw_specs = fp.read()
+			specs = yaml.load(raw_specs)
+		#---load the yaml specifications file
+		if type(spec_fn)==str: spec_fn = [spec_fn]
+		raw_specs = ''
+		for sfn in spec_fn: 
+			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
 		specs = yaml.load(raw_specs)
 		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
 			self.paths['specs_file'])
