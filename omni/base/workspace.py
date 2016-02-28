@@ -40,7 +40,7 @@ class Workspace():
 		self.parse_specs = unpacker(conf_paths,'parse_specs')
 		self.machine = unpacker(conf_gromacs,'machine_configuration')[machine_name]
 		self.nprocs = self.machine['nprocs']
-		#---! need consistent rootdir behavior!
+		#---! need consistent rootdir behavior! also need to address data_spots!
 		self.rootdir = os.path.join(path_expand(self.paths['data_spots'][0]),'')
 		self.postdir = os.path.join(path_expand(self.paths['post_data_spot']),'')
 		self.plotdir = os.path.join(path_expand(self.paths['post_plot_spot']),'')
@@ -539,8 +539,10 @@ class Workspace():
 				for c in candidates:
 					nnum = int(re.findall('^.+\.n([0-9]+)\.spec',c)[0])
 					with open(c) as fp: options[c] = eval(fp.read())
-				#---interpret calculation from the meta file
-				with open(self.paths['specs_file']) as fp: meta = yaml.load(fp)
+				if 0:
+					#---interpret calculation from the meta file
+					with open(self.paths['specs_file']) as fp: meta = yaml.load(fp)
+				meta = self.load_specs()
 				new_calcs = self.interpret_specs(meta['calculations'][calcname])				
 				#---use lookup to whittle these calculations
 				if lookup:
@@ -681,6 +683,30 @@ class Workspace():
 			
 	#---READ SPECIFICATIONS FILES
 
+	def load_specs(self,merge_method='strict'):
+
+		"""
+		A central place where we read all specs files.
+		Note that this is where we implement a new part of the framework in which all files of a particular
+		naming convention are interpreted as specifications and then intelligently merged.
+		This feature allows the user and the factory to create new specs without conflicts and without 
+		overspecifying how these things will work.
+		"""
+
+		import copy
+		specs_files = glob.glob('./calcs/specs/meta*yaml')
+		allspecs = []
+		for fn in specs_files:
+			with open(fn) as fp: allspecs.append(yaml.load(fp.read()))
+		if merge_method=='strict':
+			specs = allspecs.pop(0)
+			for spec in allspecs:
+				for key,val in spec.items():
+					if key not in specs: specs[key] = copy.deepcopy(val)
+					else: raise Exception('\n[ERROR] redundant key %s in more than one meta file'%key)
+		else: raise Exception('\n[ERROR] unclear meta specs merge method %s'%merge_method)
+		return specs
+
 	def action(self,calculation_name=None,spec_fn='specs.yaml',dry=False):
 	
 		"""
@@ -693,14 +719,18 @@ class Workspace():
 		if 0:
 			with open(spec_fn,'r') as fp: raw_specs = fp.read()
 			specs = yaml.load(raw_specs)
-		#---load the yaml specifications file
-		if type(spec_fn)==str: spec_fn = [spec_fn]
-		raw_specs = ''
-		for sfn in spec_fn: 
-			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
-		specs = yaml.load(raw_specs)
-		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
-			self.paths['specs_file'])
+		#---old concatenation 
+		if 0:
+			#---load the yaml specifications file
+			if type(spec_fn)==str: spec_fn = [spec_fn]
+			raw_specs = ''
+			for sfn in spec_fn: 
+				with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
+			specs = yaml.load(raw_specs)
+			if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
+				self.paths['specs_file'])
+		#---! need to remove specs.yaml from the kwargs above
+		specs = self.load_specs()
 		#---either simulations are placed at the root of the YAML file or in the slices dictionary
 		sns = [key for key in specs if re.match(self.datahead['toc']['regex'][0],key)]
 		if 'slices' in specs:
