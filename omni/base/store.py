@@ -68,13 +68,16 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 	"""
 
 	#---read plot specification
-	if not specfile: specfile = work.paths['specs_file']
-	#---load the yaml specifications file
-	if type(specfile)==str: specfile = [specfile]
-	raw_specs = ''
-	for sfn in specfile: 
-		with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
-	specs = yaml.load(raw_specs)
+	if 0:
+		if not specfile: specfile = work.paths['specs_file']
+		#---load the yaml specifications file
+		if type(specfile)==str: specfile = [specfile]
+		raw_specs = ''
+		for sfn in specfile: 
+			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
+		specs = yaml.load(raw_specs)
+	specs = work.load_specs()
+	import pdb;pdb.set_trace()
 
 	#---merge automatic plots here
 	if 'autoplots' in specs:

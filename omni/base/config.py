@@ -18,7 +18,6 @@ paths = {
 	'post_data_spot':POST,
 	'post_plot_spot':PLOT,
 	'workspace_spot':WORK,
-	'specs_file':SPECS,
 	}
 """
 
@@ -68,17 +67,6 @@ def check_work_file(fn):
 	fn = os.path.abspath(os.path.expanduser(fn))
 	if os.path.isfile(fn): print '[WARNING] %s already exists'%fn
 	return True
-
-def check_specs_file(fn):
-	
-	"""
-	Confirm that the user has supplied a valid directory.
-	"""
-	
-	fn = os.path.abspath(os.path.expanduser(fn))
-	if os.path.isfile(fn): print '[WARNING] %s already exists'%fn
-	else: print '[NOTE] you must create this file'
-	return True
 	
 #---guide for setting paths for the first time
 config_help = {
@@ -94,9 +82,6 @@ config_help = {
 	'WORK':{'name':'workspace file location','default':'./workspace',
 	'help':'location for storing the workspace file',
 	'valid':check_work_file},
-	'SPECS':{'name':'specifications file','default':'./meta.yaml',
-	'help':'location for setting specifications',
-	'valid':check_specs_file},
 	}
 
 #---default parser specifications
@@ -131,7 +116,7 @@ def bootstrap_paths(defaults=False,post=None,plot=None):
 	if os.path.exists(fn): raise Exception('[DEVERROR] only bootstrap if paths.py is absent')
 	paths_script = str(default_paths)
 	#---begin user intervention because paths are crucial
-	for key in ['DATA','POST','PLOT','WORK','SPECS']:
+	for key in ['DATA','POST','PLOT','WORK']:
 		ans = ''
 		if key == 'POST' and post != None: ans = post
 		if key == 'PLOT' and post != None: ans = plot
@@ -145,7 +130,6 @@ def bootstrap_paths(defaults=False,post=None,plot=None):
 			ans = config_help[key]['default']
 		if not config_help[key]['valid'](ans): raise Exception('[ERROR] invalid response')
 		else: paths_script = re.sub(key,"'%s'"%ans,paths_script)
-	#import pdb;pdb.set_trace()
 	#---end user intervention
 	with open(fn,'w') as fp: 
 		fp.write(paths_script)
@@ -154,4 +138,3 @@ def bootstrap_paths(defaults=False,post=None,plot=None):
 	for line in paths_script.split('\n'): print '|  '+re.sub('\t','  ',line)
 	print '[STATUS] edit this file at %s'%fn	
 	print "[NOTE] modify the parse_specs variable in %s to search the dataset"%fn
-
