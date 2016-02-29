@@ -77,7 +77,6 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
 		specs = yaml.load(raw_specs)
 	specs = work.load_specs()
-	import pdb;pdb.set_trace()
 
 	#---merge automatic plots here
 	if 0:
