@@ -70,7 +70,6 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 		if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
 		#---! note that this code is repeated in multiple places and needs consolidation
 		#---! locations include workspace.py,action and store.py,plotload
-		specs = workspace.load_specs()
 		#---! merge is now handled in workspace so this needs removed
 		#---merge automatic calculations here
 		if 0:
@@ -87,6 +86,7 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 							", which is populated with django so check calculator.Calculation")
 					else: specs['plots'][key] = deepcopy(val)
 		work = Workspace(workspace,previous=False)
+		specs = work.load_specs()
 		plotnames = specs['plots'].keys()
 	else: plotnames = [plotname]
 	#---for each desired plot type
