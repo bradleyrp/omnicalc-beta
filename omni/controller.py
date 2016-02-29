@@ -70,29 +70,22 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 		if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
 		#---! note that this code is repeated in multiple places and needs consolidation
 		#---! locations include workspace.py,action and store.py,plotload
-
-		#---load the yaml specifications file
-		if type(spec_fn)==str: spec_fn = [spec_fn]
-		raw_specs = ''
-		for sfn in spec_fn: 
-			with open(sfn,'r') as fp: raw_specs += '\n'+fp.read()
-		specs = yaml.load(raw_specs)
-		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
-			self.paths['specs_file'])
+		specs = workspace.load_specs()
 		#---! merge is now handled in workspace so this needs removed
 		#---merge automatic calculations here
-		if 'autocalcs' in specs:
-			for key,val in specs['autocalcs'].items():
-				if key in specs['calculations']: 
-					raise Exception('\n[ERROR] redundant names in calculations and autocalcs: %s'%key+
-						", which is populated with django so check calculator.Calculation")
-				else: specs['calculations'][key] = deepcopy(val)
-		if 'autoplots' in specs:
-			for key,val in specs['autoplots'].items():
-				if key in specs['plots']: 
-					raise Exception('\n[ERROR] redundant names in plots and autoplots: %s'%key+
-						", which is populated with django so check calculator.Calculation")
-				else: specs['plots'][key] = deepcopy(val)
+		if 0:
+			if 'autocalcs' in specs:
+				for key,val in specs['autocalcs'].items():
+					if key in specs['calculations']: 
+						raise Exception('\n[ERROR] redundant names in calculations and autocalcs: %s'%key+
+							", which is populated with django so check calculator.Calculation")
+					else: specs['calculations'][key] = deepcopy(val)
+			if 'autoplots' in specs:
+				for key,val in specs['autoplots'].items():
+					if key in specs['plots']: 
+						raise Exception('\n[ERROR] redundant names in plots and autoplots: %s'%key+
+							", which is populated with django so check calculator.Calculation")
+					else: specs['plots'][key] = deepcopy(val)
 		work = Workspace(workspace,previous=False)
 		plotnames = specs['plots'].keys()
 	else: plotnames = [plotname]
