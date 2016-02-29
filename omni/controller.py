@@ -24,7 +24,7 @@ def config(defaults=False,post=None,plot=None):
 #---FUNCTIONS
 #-------------------------------------------------------------------------------------------------------------
 
-def compute(calculation_name=None,specfile=None,workspace=None,autoreload=False,dry=False):
+def compute(calculation_name=None,workspace=None,autoreload=False,dry=False):
 
 	"""
 	Open the workspace, parse a YAML script with instructions, save, and exit.
@@ -32,7 +32,6 @@ def compute(calculation_name=None,specfile=None,workspace=None,autoreload=False,
 
 	from base.workspace import Workspace
 	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
-	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
 	work = Workspace(workspace,previous=False,autoreload=autoreload)
 	work.action(calculation_name=calculation_name,dry=dry)
 	work.save()
