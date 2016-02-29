@@ -68,7 +68,6 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 	if plotname == None:
 		from base.workspace import Workspace
 		if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
-		if specfile == None: spec_fn = unpacker(conf_paths,'paths')['specs_file']
 		#---! note that this code is repeated in multiple places and needs consolidation
 		#---! locations include workspace.py,action and store.py,plotload
 
