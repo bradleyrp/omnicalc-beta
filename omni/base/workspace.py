@@ -707,7 +707,7 @@ class Workspace():
 		else: raise Exception('\n[ERROR] unclear meta specs merge method %s'%merge_method)
 		return specs
 
-	def action(self,calculation_name=None,spec_fn='specs.yaml',dry=False):
+	def action(self,calculation_name=None,dry=False):
 	
 		"""
 		Parse a specifications file to make changes to a workspace.

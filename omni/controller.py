@@ -34,7 +34,7 @@ def compute(calculation_name=None,specfile=None,workspace=None,autoreload=False,
 	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
 	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
 	work = Workspace(workspace,previous=False,autoreload=autoreload)
-	work.action(calculation_name=calculation_name,spec_fn=specfile,dry=dry)
+	work.action(calculation_name=calculation_name,dry=dry)
 	work.save()
 
 def look(workspace=None,nox=False):
@@ -69,6 +69,7 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 	if plotname == None:
 		from base.workspace import Workspace
 		if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
+		import pdb;pdb.set_trace()
 		if specfile == None: spec_fn = unpacker(conf_paths,'paths')['specs_file']
 		#---! note that this code is repeated in multiple places and needs consolidation
 		#---! locations include workspace.py,action and store.py,plotload
@@ -81,6 +82,7 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 		specs = yaml.load(raw_specs)
 		if not specs: raise Exception('\n[ERROR] specs file at %s appears to be empty'%
 			self.paths['specs_file'])
+		#---! merge is now handled in workspace so this needs removed
 		#---merge automatic calculations here
 		if 'autocalcs' in specs:
 			for key,val in specs['autocalcs'].items():

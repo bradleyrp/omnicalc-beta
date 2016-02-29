@@ -51,7 +51,9 @@ def slice_trajectory(start,end,skip,seq_time_fn,outkey='TMP',
 			(start <= span[1] and start >= span[0]),
 			(end <= span[1] and end >= span[0]),
 			(start <= span[0] and end >= span[1])]):
-			t0 = int(span[0]/float(skip)+1)*float(skip)
+			#---! why is there a skip+1 below? it is wrong at both the beginning and end
+			#---! this needs fixed/made sensible
+			t0 = int(span[0]/float(skip)+0)*float(skip)
 			chop.append((key,t0))
 	#---make the XTC files
 	cmdlist = []
