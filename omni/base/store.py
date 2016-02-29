@@ -80,12 +80,13 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 	import pdb;pdb.set_trace()
 
 	#---merge automatic plots here
-	if 'autoplots' in specs:
-		for key,val in specs['autoplots'].items():
-			if key in specs['plots']: 
-				raise Exception('\n[ERROR] redundant names in plots and autoplots: %s'%key+
-					", which is populated with django so check calculator.Calculation")
-			else: specs['plots'][key] = deepcopy(val)
+	if 0:
+		if 'autoplots' in specs:
+			for key,val in specs['autoplots'].items():
+				if key in specs['plots']: 
+					raise Exception('\n[ERROR] redundant names in plots and autoplots: %s'%key+
+						", which is populated with django so check calculator.Calculation")
+				else: specs['plots'][key] = deepcopy(val)
 	plotspecs = specs['plots'][plotname]
 
 	#---load the calculation from the workspace
