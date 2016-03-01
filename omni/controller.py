@@ -44,7 +44,7 @@ def look(workspace=None,nox=False):
 
 	os.system('python -i ./omni/base/header.py'+(' nox' if nox else ''))
 
-def refresh(specfile=None,workspace=None,autoreload=False,dry=False):
+def refresh(workspace=None,autoreload=False,dry=False):
 
 	"""
 	If you have new data or more data (i.e. more XTC files or longer trajectories) you must
@@ -53,7 +53,6 @@ def refresh(specfile=None,workspace=None,autoreload=False,dry=False):
 
 	from base.workspace import Workspace
 	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
-	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
 	work = Workspace(workspace,previous=False,autoreload=autoreload)
 	work.bootstrap()
 	work.save()
@@ -105,21 +104,19 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 			status('calling: "%s"'%cmd,tag='status')
 			os.system(cmd)
 
-def tests(specfile=None,nox=False):
+def tests(nox=False):
 
 	"""
 	Run the test suite. 
-	Makes all plots found in the test_plots section of the specs_files.
 	"""
 
 	from base.workspace import Workspace
-	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
 	with open(specfile,'r') as fp: test_plot_names = yaml.load(fp.read())['test_plots']
 	for name in test_plot_names:
 		print '[TEST SUITE] plotting %s'%name
 		os.system('python calcs/plot-'+name+'.py'+(' nox' if nox else ''))
 
-def export_to_factory(project_name,project_location,specfile=None,workspace=None):
+def export_to_factory(project_name,project_location,workspace=None):
 
 	"""
 	Export the simulation data from the toc to the factory database.
@@ -133,7 +130,6 @@ def export_to_factory(project_name,project_location,specfile=None,workspace=None
 	from simulator import models
 	from base.workspace import Workspace
 	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
-	if specfile == None: specfile = unpacker(conf_paths,'paths')['specs_file']
 	try:
 		work = Workspace(workspace,previous=False)
 		for key in work.toc: models.Simulation(name=key,program="protein",code=key).save()
