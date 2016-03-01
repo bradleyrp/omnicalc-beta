@@ -323,13 +323,11 @@ class Workspace():
 		#---toc is a nested dictionary of the available top directories and subdirectories
 		#---note that if we wanted tuples as keys in newtoc we would use the following code:
 		#---"re.findall(self.datahead['toc']['regex'][0],s)[0]" instead of s below
-		#---! replaced zip with matches_first due to weird itertools errors removed zip from 
-		matches_first = [i[0] for i in matches]
 		newtoc = dict([(s,
 			dict([(re.findall(regex_sub,t)[0],[]) for t in 
 				set([x[1] for x in matches if x[0]==s])
 				if re.match(regex_sub,t)])
-			) for s in set(matches_first)])
+			) for s in set(list(zip(*matches))[0])])
 		#---load the filenames
 		for dn,sub,fn in matches:
 			if (re.match(regex_sub,sub) and
@@ -389,9 +387,9 @@ class Workspace():
 
 		root = self.toc[sn]
 		ordered = {}
-		for letter in list(set(zip(*root.keys())[0])):
+		for letter in list(set(list(zip(*root.keys()))[0])):
 			keys = [k for k in root if k[0]==letter]
-			ordered[letter] = [keys[j] for j in argsort(map(lambda y:int(y),zip(*keys)[1]))]
+			ordered[letter] = [keys[j] for j in argsort(map(lambda y:int(y),list(zip(*keys))[1]))]
 		if letter in [None,'']: return ordered
 		else: return [j for k in 
 			[ordered[i] for i in ordered if re.match('^(%s)'%('|'.join(letters)),i)]
