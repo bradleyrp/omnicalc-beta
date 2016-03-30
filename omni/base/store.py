@@ -123,7 +123,7 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 			calc = deepcopy(work.calc[calcname])
 			#---loop over simulations 
 			for snum,sn in enumerate(sns):
-				status(sn,tag='load',i=snum,looplen=len(sns))
+				status(sn.ljust(26),tag='load',i=snum,looplen=len(sns))
 				#---slices in plotspecs or lookup from variables with plus-syntax
 				#---! need to allow blank slices here so that the machine looks to calcs to get them
 				if 'slices' in plotspecs and not re.match('^\+',plotspecs['slices']): 

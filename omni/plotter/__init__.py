@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from numpy import *
+#---! removed "from numpy import *"
 import matplotlib as mpl 
 import matplotlib.pyplot as plt
 

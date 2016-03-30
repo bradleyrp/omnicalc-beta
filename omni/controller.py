@@ -129,6 +129,7 @@ def export_to_factory(project_name,project_location,workspace=None):
 	django.setup()
 	from simulator import models
 	from base.workspace import Workspace
+	#---! rpb sez remove all optional workspace arguments
 	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
 	try:
 		work = Workspace(workspace,previous=False)

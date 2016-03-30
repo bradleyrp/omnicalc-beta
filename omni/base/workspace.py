@@ -258,10 +258,10 @@ class Workspace():
 	def path(self,name):
 
 		"""
-		Return completed paths.
+		Return completed, absolute paths.
 		"""
 
-		return os.path.join(self.paths[name],'')
+		return os.path.join(os.path.abspath(os.path.expanduser(self.paths[name])),'')
 
 	#---MDAnalysis 
 
