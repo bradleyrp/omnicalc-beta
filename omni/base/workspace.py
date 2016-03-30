@@ -3,7 +3,6 @@
 import sys,os,re,time,glob
 import yaml
 import pickle,json,copy,glob
-from constants import conf_paths,conf_gromacs
 from base.tools import unpacker,path_expand,status,argsort,unescape,tupleflat
 from base.tools import delve,asciitree,catalog,status,unique,flatten
 from base.gromacs_interface import edrcheck,slice_trajectory,machine_name
@@ -13,6 +12,8 @@ from base.timer import checktime
 from base.store import picturefind
 from copy import deepcopy
 import MDAnalysis
+
+conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
 
 #---joblib and multiprocessing modules require all functions to be registered in __main__
 for fn in glob.glob('calcs/codes/*.py'): execfile(fn)
@@ -98,7 +99,10 @@ class Workspace():
 
 	def bootstrap(self):
 
-		#---bootstrapping the paths.py file will also make the directory
+		"""
+		"""
+
+		#---paths.yaml specifies directories which might be absent so make them
 		if not os.path.isdir(self.postdir): os.mkdir(self.postdir)
 		if not os.path.isdir(self.plotdir): os.mkdir(self.plotdir)
 		if len(self.paths['data_spots'])>1:

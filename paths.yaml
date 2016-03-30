@@ -1,0 +1,33 @@
+### OMNICALC PATHS
+
+# write "slices" and postprocessing data to the post_data_spot
+post_data_spot: post
+# plots are written to a separate directory
+post_plot_spot: plot
+# the workspace is represented in a local file
+workspace_spot: workspace
+# omnicalc looks for simulation data in a "spot" containing folders, each of which holds a simulation
+spots:
+  # colloquial name for the "spot"
+  simulations:
+    # name downstream postprocessing data according to the spot name (above) and simulation folder (top)
+    # note: that namer is set by default to take a simulation number and save "e.g. v1000.my_calc.dat"
+    # hint: if you have multiple spots then you *must* use spot in the namer or you violate uniqueness
+    namer: "lambda spot,top = 'v'+re.findall('simulation-v([0-9]+)',top)[0]"
+    # parent location of the spot_directory (may be changed if you mount the data elsewhere)
+    route_to_data: /home/rpb/omicron
+    # path of the parent directory for the simulation data
+    # note: that omnicalc joins route_to_data and spot_directory only propagates this information via namer
+    # hint: this means that you can move the data but make sure namer doesn't lose track of the spot
+    spot_directory: dataset-project-ptdins
+    # rules for parsing the data in the spot directories
+    regexes:
+      # each simulation folder in the spot directory must match the top regex
+      top: "(membrane-v[0-9]+)"
+      # each simulation folder must have trajectories in subfolders that match the step regex (can be null)
+      step: "([stuv])([0-9]+)-([^\/]+)"
+      # each part regex is parsed by omnicalc
+      part: 
+        - "md.part([0-9]{4})\.xtc"
+        - "md.part([0-9]{4})\.trr"
+        - "(system|system-input|structure)\.(gro|pdb)"

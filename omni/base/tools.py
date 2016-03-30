@@ -2,6 +2,7 @@
 
 import os,sys,re,inspect,subprocess,time
 import traceback
+import yaml
 
 def flatten(k):
 	while any([type(j)==list for j in k]): k = [i for j in k for i in j] 
@@ -11,9 +12,22 @@ def delve(o,*k): return delve(o[k[0]],*k[1:]) if len(k)>1 else o[k[0]]
 unescape = lambda x: re.sub(r'\\(.)',r'\1',x)
 argsort = lambda seq : [x for x,y in sorted(enumerate(seq), key = lambda x: x[1])]
 def path_expand(fn): return os.path.abspath(os.path.expanduser(fn))
-def unpacker(fn,key):
-	d = {};execfile(fn,d);return d[key]
 tupleflat = lambda x: [j for k in [list([i]) if type(i)!=tuple else list(i) for i in x] for j in k]
+
+def unpacker(fn,name=None):
+
+	"""
+	Read a py or yaml file and return a variable by name.
+	"""
+	
+	if re.match('^.+\.py',os.path.basename(fn)):
+		incoming = {}
+		execfile(fn,incoming)
+		return incoming if not name else incoming[name]
+	elif re.match('^.+\.yaml',os.path.basename(fn)):
+		with open(fn) as fp: incoming = yaml.load(fp.read())
+		return incoming if not name else incoming[name]
+	else: raise Exception('unpacker can only read py or yaml files, not %s'%fn)
 
 def catalog(base,path=None):
 

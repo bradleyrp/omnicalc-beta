@@ -4,22 +4,10 @@ import os,sys,time,shutil
 import yaml
 import re,pickle,subprocess,glob,inspect
 from base.config import bootstrap_gromacs,bootstrap_paths
-from base.constants import conf_paths,conf_gromacs
 from base.store import load
 from base.tools import unpacker,delve,status,call
 
-#---CONFIGURE
-#-------------------------------------------------------------------------------------------------------------
-
-def config(defaults=False,post=None,plot=None):
-
-	"""
-	Configure paths and GROMACS paths.
-	All configuration files (paths.py, gromacs.py) are local.
-	"""
-	
-	if not os.path.isfile(conf_paths): bootstrap_paths(defaults=defaults,post=post,plot=plot)
-	if not os.path.isfile(conf_gromacs): bootstrap_gromacs()
+conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
 
 #---FUNCTIONS
 #-------------------------------------------------------------------------------------------------------------
@@ -201,9 +189,6 @@ def makeface(*arglist):
 	for stray in ['--','w','ws','sw','s']:
 		if stray in arglist: arglist.remove(stray)
 	funcname = arglist.pop(0)
-	#---if not configured we exit
-	if (not os.path.isfile(conf_paths) or not os.path.isfile(conf_gromacs)) and funcname != 'config': 
-		raise Exception('\n[ERROR] run make config to generate gromacs.py and paths.py')
 	while len(arglist)>0:
 		arg = arglist.pop(0)
 		regex = '^([^\=]+)\=(.+)'
