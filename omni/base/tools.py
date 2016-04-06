@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os,sys,re,inspect,subprocess,time
+import os,sys,re,inspect,subprocess,time,collections
 import traceback
 import yaml
 
@@ -9,10 +9,27 @@ def flatten(k):
 	return k
 def unique(k): return list(set(k))
 def delve(o,*k): return delve(o[k[0]],*k[1:]) if len(k)>1 else o[k[0]]
+def delve_dev(o,*k): 
+	print "[STATUS] delving: %s,%s"%(str(o),str(k))
+	try: sendup = delve(o[k[0]],*k[1:]) if len(k)>1 else o[k[0]]
+	except:
+		print "[ERROR] delve got stuck"
+		import pdb;pdb.set_trace()
+	return sendup
+#---! debuggable delve
+#delve = delve_dev
 unescape = lambda x: re.sub(r'\\(.)',r'\1',x)
 argsort = lambda seq : [x for x,y in sorted(enumerate(seq), key = lambda x: x[1])]
 def path_expand(fn): return os.path.abspath(os.path.expanduser(fn))
 tupleflat = lambda x: [j for k in [list([i]) if type(i)!=tuple else list(i) for i in x] for j in k]
+
+#---! use ordered dictionary in yaml ... this is now deprecated because of problems with interpret_specs
+if 0:
+	_mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
+	def dict_representer(dumper,data): return dumper.represent_dict(data.iteritems())
+	def dict_constructor(loader,node): return collections.OrderedDict(loader.construct_pairs(node))
+	yaml.add_representer(collections.OrderedDict,dict_representer)
+	yaml.add_constructor(_mapping_tag,dict_constructor)
 
 def unpacker(fn,name=None):
 
@@ -39,7 +56,7 @@ def catalog(base,path=None):
 	if isinstance(base,dict):
 		for x in base.keys():
 			local_path = path[:]+[x]
-			for b in catalog(base[x], local_path): yield b
+			for b in catalog(base[x],local_path): yield b
 	else: yield path,base
 
 def asciitree(obj,depth=0,wide=2,last=[],recursed=False):
@@ -101,7 +118,7 @@ def asciitree(obj,depth=0,wide=2,last=[],recursed=False):
 	else: print 'unhandled tree object'
 	if not recursed: print '\n'
 
-def status(string,i=0,looplen=None,bar_character=None,width=25,tag='',start=None):
+def status(string,i=0,looplen=None,bar_character=None,width=25,tag='',start=None,show_bar=True):
 
 	"""
 	Show a status bar and counter for a fixed-length operation.
@@ -122,11 +139,13 @@ def status(string,i=0,looplen=None,bar_character=None,width=25,tag='',start=None
 			width = 15
 		else: timestring = ''
 		countstring = str(i+1)+'/'+str(looplen)
-		bar = ' %s%s%s '%(left,int(width*(i+1)/looplen)*bb+' '*(width-int(width*(i+1)/looplen)),right)
+		if show_bar: 
+			bar = ' %s%s%s '%(left,int(width*(i+1)/looplen)*bb+' '*(width-int(width*(i+1)/looplen)),right)
+		else: bar = ' '
 		if not logfile: 
 			print unicode(u'\r'+string+bar+countstring+timestring+' '),
 		else: sys.stdout.write('\r'+string+bar+countstring+timestring+' ')
-		if i+1<looplen: sys.stdout.flush()
+		if i+1<looplen and show_bar: sys.stdout.flush()
 		else: print '\n',
 
 def call(command,logfile=None,cwd=None,silent=False,inpipe=None,suppress_stdout=False):

@@ -90,7 +90,6 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 
 	#---load the calculation from the workspace
 	calcnames = plotspecs['calculation']
-	status('update work.calc with "make compute dry" if it is out of date',tag='warning')
 
 	if type(calcnames)==str: calcnames = [calcnames]
 	datasets = {name:[] for name in calcnames}
@@ -127,7 +126,7 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 				#---slices in plotspecs or lookup from variables with plus-syntax
 				#---! need to allow blank slices here so that the machine looks to calcs to get them
 				if 'slices' in plotspecs and not re.match('^\+',plotspecs['slices']): 
-					sl = work.slices[sn][plotspecs['slices']]['all' if not group else group]
+					sl = work.slice(sn)[plotspecs['slices']]['all' if not group else group]
 				elif 'slices' in plotspecs: 
 					sl = deepcopy(delve(work.vars,*plotspecs['slices'].strip('+').split('/')))
 					#---the slice might not have a filekey if its a combo

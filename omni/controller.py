@@ -3,7 +3,6 @@
 import os,sys,time,shutil
 import yaml
 import re,pickle,subprocess,glob,inspect
-from base.config import bootstrap_gromacs,bootstrap_paths
 from base.store import load
 from base.tools import unpacker,delve,status,call
 
@@ -12,27 +11,30 @@ conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
 #---FUNCTIONS
 #-------------------------------------------------------------------------------------------------------------
 
-def compute(calculation_name=None,workspace=None,autoreload=False,dry=False):
+def compute(calculation_name=None,autoreload=False):
 
 	"""
 	Open the workspace, parse a YAML script with instructions, save, and exit.
+	Note that we may specify a particular calculation if there are many pending calculations.
 	"""
 
 	from base.workspace import Workspace
-	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
-	work = Workspace(workspace,previous=False,autoreload=autoreload)
-	work.action(calculation_name=calculation_name,dry=dry)
+	workspace = unpacker(conf_paths)['workspace_spot']
+	work = Workspace(workspace,autoreload=autoreload)
+	work.action(calculation_name=calculation_name)
 	work.save()
 
 def look(workspace=None,nox=False):
 
 	"""
 	Take a look around (you). Drops you into an interactive shell with the header.
+	DEVELOPMENT NOTE: nox was added to suppress X11 windows when running from OSX but this is purely a 
+	...mac problem and it may be worth finding a more durable solution.
 	"""
 
 	os.system('python -i ./omni/base/header.py'+(' nox' if nox else ''))
 
-def refresh(workspace=None,autoreload=False,dry=False):
+def refresh(autoreload=False):
 
 	"""
 	If you have new data or more data (i.e. more XTC files or longer trajectories) you must
@@ -40,8 +42,8 @@ def refresh(workspace=None,autoreload=False,dry=False):
 	"""
 
 	from base.workspace import Workspace
-	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
-	work = Workspace(workspace,previous=False,autoreload=autoreload)
+	workspace = unpacker(conf_paths)['workspace_spot']
+	work = Workspace(workspace,autoreload=autoreload)
 	work.bootstrap()
 	work.save()
 	
@@ -54,7 +56,7 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 	from copy import deepcopy
 	if plotname == None:
 		from base.workspace import Workspace
-		if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
+		if workspace == None: workspace = unpacker(conf_paths)['workspace_spot']
 		#---! note that this code is repeated in multiple places and needs consolidation
 		#---! locations include workspace.py,action and store.py,plotload
 		#---! merge is now handled in workspace so this needs removed
@@ -118,7 +120,7 @@ def export_to_factory(project_name,project_location,workspace=None):
 	from simulator import models
 	from base.workspace import Workspace
 	#---! rpb sez remove all optional workspace arguments
-	if workspace == None: workspace = unpacker(conf_paths,'paths')['workspace_spot']
+	if workspace == None: workspace = unpacker(conf_paths)['workspace_spot']
 	try:
 		work = Workspace(workspace,previous=False)
 		for key in work.toc: models.Simulation(name=key,program="protein",code=key).save()
@@ -218,4 +220,4 @@ if __name__ == "__main__":
 	#---if the function is not above check scripts
 	if sys.argv[1] not in globals(): 
 		for fn in glob.glob('./calcs/scripts/*.py'): execfile(fn)
-	makeface(*sys.argv[1:])
+	else: makeface(*sys.argv[1:])

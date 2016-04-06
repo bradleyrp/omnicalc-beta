@@ -73,10 +73,12 @@ if 'modules' in machine_configuration:
 	except: raise Exception('could not execute %s'%module_path)
 	print '[STATUS] unloading GROMACS'
 	#---note that modules that rely on dynamically-linked C-code must use EnvironmentModules
-	for mod in machine_configuration['modules'].split(','):
+	modules = machine_configuration['modules']
+	modules = [modules] if type(modules)==str else modules
+	for mod in modules:
 		print '[STATUS] module load %s'%mod
 		module('load',mod)
-	del mod
+	if 'mod' in globals(): del mod
 
 #---basic check for gromacs version series
 suffix = '' if 'suffix' not in machine_configuration else machine_configuration['suffix']
@@ -104,4 +106,5 @@ machine_name = str(this_machine)
 del config,this_machine,gmx5paths,gmx4paths,config_raw,module_path
 del check_gmx,gmx_series,hostnames
 if suffix != '': gmxpaths = dict([(key,val+suffix) for key,val in gmxpaths.items()])
+del suffix
 

@@ -3,14 +3,12 @@
 #-------------------------------------------------------------------------------------------------------------
 
 #---always show the banner
+-include banner
 banner:
 	@echo -n "[STATUS] banner: "
-	sed -n 1,7p omni/readme.md
+	@sed -n 1,7p omni/readme.md
 	@echo "[STATUS] use 'make help' for details"
 
-#---fun banner first
--include banner
-	
 #---valid function names from the python script
 TARGETS := $(shell perl -n -e '@parts = /^def\s+[a-z,_]+/g; $$\ = "\n"; print for @parts;' omni/controller.py calcs/scripts/*.py | awk '{print $$2}')
 
@@ -19,13 +17,24 @@ RUN_ARGS_UNFILTER := $(wordlist 1,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 RUN_ARGS := $(filter-out banner help,$(RUN_ARGS_UNFILTER))
 $(eval $(RUN_ARGS):;@:)
 
+#---exit if target not found
+controller_function = $(word 1,$(RUN_ARGS))
+ifneq ($(controller_function),)
+ifeq ($(filter $(controller_function),$(TARGETS)),)
+    $(info [ERROR] "$(controller_function)"" is not a valid make target)
+    $(info [ERROR] targets are python function names in omni/controller.py or calcs/scripts/*.py)
+    $(info [ERROR] valid targets include: $(TARGETS))
+    $(error [ERROR] exiting)
+endif
+endif
+
 #---do not target arguments if using python
 .PHONY: banner ${RUN_ARGS}
 
 #---hack to always run makefile interfaced with python
-scripts=omni/controller.py
+scripts = omni/controller.py
 $(shell touch $(scripts))
-checkfile=.pipeline_up_to_date
+checkfile = .pipeline_up_to_date
 
 #---targets
 $(checkfile): $(scripts)

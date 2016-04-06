@@ -2,14 +2,14 @@
 
 import sys,os,re,time,glob
 import yaml
-import pickle,json,copy,glob
+import pickle,json,copy,glob,signal,collections
 from base.tools import unpacker,path_expand,status,argsort,unescape,tupleflat
 from base.tools import delve,asciitree,catalog,status,unique,flatten
-from base.gromacs_interface import edrcheck,slice_trajectory,machine_name
+from base.gromacs_interface import gmxread,mdasel,edrcheck,slice_trajectory,machine_name
 from base.hypothesis import hypothesis
 from base.computer import computer
 from base.timer import checktime
-from base.store import picturefind
+from base.store import picturefind,store
 from copy import deepcopy
 import MDAnalysis
 
@@ -24,27 +24,47 @@ for fn in glob.glob('calcs/codes/*.py'): execfile(fn)
 class Workspace():
 
 	"""
-	Wrapper for a workspace object that organizes all simulation data and postprocess.
-	Note that the variable name "toc" is used throughout and refers to a table of contents.
+	The "workspace" represents the requested slices, groups, calculations, and plots, to the rest of the 
+	omnicalc codes. It reads YAML-formatted specs files saved to calcs/specs/*.yaml and then performs the 
+	following functions in order:
+
+	1. Index the molecules in a simulation to make a "group". These are used to generate slices of the 
+	   simulation trajectory which contain certain elements specified by the user.
+	2. Make a "slice" of a simulation trajectory. Typically we sample a part of a production run with a 
+	   specific start time, duration, and sampling interval.
+	3. Run a calculation on many simulations, grouped by "collection" and specified by specially-formatted 
+	   functions in python scripts at calcs/<name>.py. These functions received the simulation data from 
+	   slices saved in the post data folder.
+	4. Makes plots from the output of the calculations.
+
+	!Note: recently removed functions which may cause downstream issues: 
+		sns,collection,get_files,shortname,key_recon,fullpath,lookup,clear_lookups,
+		path,get_regex_groups,sort_steps,picture,collect_times,
 	"""
 
 	#---presets
 	conf_paths = conf_paths
 	conf_gromacs = conf_gromacs
-	
+	#---throw an error if you are missing more than 20% of the data
+	missing_frame_tolerance = 0.2
+	#---! deprecated below?
+	members_with_specific_parts = ['slices']
+
 	def __init__(self,fn,previous=False,autoreload=False):
 
-		#---load workspace if it  exists
+		"""
+		Note that we initialize paths.yaml and superficial data first, then load from the workspace or
+		parse the dataset if the workspace was not saved.
+		"""
+
 		self.filename = path_expand(fn)
-		#---! paths and machine can change?
-		self.paths = unpacker(conf_paths,'paths')
-		self.parse_specs = unpacker(conf_paths,'parse_specs')
+		self.paths = unpacker(conf_paths)
 		self.machine = unpacker(conf_gromacs,'machine_configuration')[machine_name]
-		self.nprocs = self.machine['nprocs']
-		#---throw an error if you are missing more than 20% of the data
-		self.missing_frame_tolerance = 0.2
-		#---! need consistent rootdir behavior! also need to address data_spots!
-		self.rootdir = os.path.join(path_expand(self.paths['data_spots'][0]),'')
+		del sys.modules['yaml']
+
+		self.nprocs = self.machine['nprocs'] if 'nprocs' in self.machine else 1
+		#---write timeseries to the post data directory when making slices
+		self.write_timeseries_to_disk = self.paths.get('timekeeper',False)
 		self.postdir = os.path.join(path_expand(self.paths['post_data_spot']),'')
 		self.plotdir = os.path.join(path_expand(self.paths['post_plot_spot']),'')
 		#---generic variables associated with the workspace
@@ -53,361 +73,312 @@ class Workspace():
 		self.calc = {}
 		#---automatically add preexisting files to the workspace if they are found
 		self.autoreload = autoreload
-		#---remember logic for substitutions in YAML specifications files
-		self.lookups = []
-		#---open self if the filename exists
+
+		#---for each "spot" in the yaml file, we construct a template for the data therein
+		#---the table of contents ("toc") holds one parsing for every part regex in every spot
+		self.spots,self.toc = {},collections.OrderedDict()
+		for name,details in self.paths['spots'].items():
+			rootdir = os.path.join(details['route_to_data'],details['spot_directory'])
+			assert os.path.isdir(rootdir)
+			for part_name,part_regex in details['regexes']['part'].items():
+				spotname = (name,part_name)
+				self.toc[spotname] = {}
+				self.spots[spotname] = {
+					'rootdir':os.path.join(rootdir,''),
+					'top':details['regexes']['top'],
+					'step':details['regexes']['step'],
+					'part':part_regex,
+					'namer':eval(details['namer']),
+					'namer_text':details['namer'],
+					}
+				self.spots[spotname]['divy_keys'] = self.divy_keys(spotname)
+		#---! note the cursor will have to change later on?
+		assert len(list(set(zip(*self.spots.keys())[0])))==1 #!---DEV
+		#---! note that you must always have an XTC entry for now
+		assert 'xtc' in zip(*self.spots.keys())[1]
+		#---set a cursor which specifies the active spot which should always be the first in the yaml
+		self.cursor = self.spots.keys()[0]
+		#---the self.c variable holds the top spot name but not the part name
+		self.c = self.cursor[0]
+		
+		#---open self if the filename exists 
+		#---note that we save parser results but not details from paths.yaml in case these change
 		if os.path.isfile(self.filename): 
 			self.load(previous=previous)
 			self.verify()
 		#---otherwise make a new workspace
 		else: self.bootstrap()
 
-	def load(self,previous=False):
-
-		"""
-		Unpack a saved pickle into self.
-		"""
-
-		incoming = pickle.load(open(self.filename,'rb'))
-		self.toc = incoming.toc
-		self.datahead = incoming.datahead
-		self.shortname_regex = incoming.shortname_regex
-		self.post = incoming.post
-		self.groups = incoming.groups
-		self.slices = incoming.slices
-		self.xtc_files = incoming.xtc_files
-		self.edr_times = incoming.edr_times
-		self.vars = incoming.vars
-		self.meta = incoming.meta
-		self.calc = incoming.calc
-		for key in [key for key in incoming.__dict__ if re.match('^toc_',key)]:
-			setattr(self,key,incoming.__dict__[key])
-		if previous: self.previous = incoming
-			
-	def save(self,quiet=False):
-
-		"""
-		Write the class to a pickle.
-		Consider another format which is more ordered.
-		"""
-
-		import time
-		from threading import Thread
-		if not quiet: status('saving',tag='work')
-		th = Thread(target=pickle.dump(self,open(self.filename,'wb')));th.start();th.join()
-		if not quiet: status('done saving',tag='work')
-
 	def bootstrap(self):
 
 		"""
+		Parse the data when the workspace is first created or when we need to re-parse the data.
 		"""
 
 		#---paths.yaml specifies directories which might be absent so make them
 		if not os.path.isdir(self.postdir): os.mkdir(self.postdir)
 		if not os.path.isdir(self.plotdir): os.mkdir(self.plotdir)
-		if len(self.paths['data_spots'])>1:
-			print '[WARNING] only one data spot is allowed so ignoring the rest'
-		
-		#---the datahead lists different "parsings" of the root data
-		#---the keys in datahead will become objects of the self
-		self.datahead = dict([(name,{'regex':self.parse_specs[name]}) for name in self.parse_specs
-			if re.match('^toc',name)])
-		if 'shortname' in self.parse_specs: self.shortname_regex = self.parse_specs['shortname']
-		
-		#---prepare and save regex which sets rules for parsing files
-		for toc in self.datahead: self.get_regex_groups(toc)
-		
-		#---ignore other tocs for now
-		if 'toc' not in self.datahead: raise Exception("[ERROR] need a 'toc' inside parse_specs")
-		
-		#---parse the tree for the primary toc
-		self.treeparser('toc')
-		self.treeparser('toc_structures',sort=False)
-		self.treeparser_xtc_edr('toc')
+		#---parse the simulations found in each "spot"
+		for spotname in self.spots: self.treeparser(spotname)
+		#---if there is a part named edr then we use it to get simulation times
+		#---! edr files are required to infer times for slicing however we might also use xtc or trr later
+		assert 'edr' in zip(*self.spots.keys())[1]
+		self.treeparser_edr()
+		#---data are stored in dictionaries by spot name
+		all_top_keys = [i for j in [k.keys() for k in self.toc.values()] for i in j]
 
-		#---data are stored in dictionaries by simulation name
-		self.post = dict([(sn,{}) for sn in self.toc.keys()])
-		self.groups = dict([(sn,{}) for sn in self.toc.keys()])
-		self.slices = dict([(sn,{}) for sn in self.toc.keys()])
+		#---! under development
+		for key in ['post','groups','slices']:
+			if key not in self.members_with_specific_parts:
+				self.__dict__[key] = {i:{} for i in all_top_keys}
+			else: self.__dict__[key] = {(spotname,i):{} 
+				for spotname in self.toc for i in self.toc[spotname]}
 		self.save()
 
+	def load(self,previous=True):
+
+		"""
+		Unpack a saved workspace pickle into self.
+		"""
+
+		incoming = pickle.load(open(self.filename,'rb'))
+		#---reconstitute things that were bootstrapped
+		#---we do not load spots because e.g. paths might have changed slightly in paths.yaml
+		self.post = incoming.post
+		self.groups = incoming.groups
+		self.slices = incoming.slices
+		self.vars = incoming.vars
+		self.meta = incoming.meta
+		self.calc = incoming.calc
+		self.toc = incoming.toc
+
+		#---retain the incoming workspace for comparison
+		if previous: self.previous = incoming
+		
+	def save(self,quiet=False):
+
+		"""
+		Write the class to a pickle.
+		Saving the workspace obviates the need to check timestamps and parse EDR files every time.
+		Note: future development here will allow the workspace to be fully and quickly reconstituted from
+		clock files saved to disk if the user sets the "timekeeper" option in paths.yaml.
+		"""
+
+		#---cannot save lambda functions in pickle
+		detach = deepcopy(self.spots)
+		for spot,details in self.spots.items(): 
+			del details['namer']
+			del details['divy_keys']
+		if not quiet: status('saving',tag='work')
+		#---ignore interrupts while writing the pickle
+		wait = signal.signal(signal.SIGINT,signal.SIG_IGN)
+		pickle.dump(self,open(self.filename,'wb'))
+		signal.signal(signal.SIGINT,wait)
+		if not quiet: status('done saving',tag='work')
+		#---reattach the lambda functions after saving
+		self.spots = detach
+		
 	def verify(self,scrub=False):
 
 		"""
 		Check the post-processing filenames to make sure they are present.
+		!!! Needs finished.
 		"""
 
+		status('passing through verify',tag='development')
+		return
+
+		#---! the following needs to be reincorprated into the workflow
 		missing_files = []
 		checks = []
 		#---group files
-		checks += [(('groups',sn,group),val[group]['fn']) for sn,val in self.groups.items() for group in val]
+		checks += [(('groups',sn,group),val[group]['fn']) 
+			for sn,val in self.groups.items() for group in val]
 		checks += [sl[name][key] for sn,sl in self.slices.items() 
 			for name in sl for key in ['gro','xtc']	if key in sl[name]]
 		for route,fn in checks:
 			if not os.path.isfile(self.postdir+fn): missing_files.append([route,fn])
-		if missing_files != [] and not scrub: status('missing files: %s'%str(missing_files),tag='warning')
+		if missing_files != [] and not scrub: 
+			status('missing files: %s'%str(missing_files),tag='warning')
 		elif missing_files != []:
 			status('scrubbing deleted files from the workspace: %s'%str(missing_files),tag='warning')
 			for route,fn in missing_files:
 				del delve(self.__dict__,*route[:-1])[route[-1]]
 		else: print '[STATUS] verified'
 
-	#---UTILITIES
-	
-	def sns(self):
-	
+	###---NAMING
+
+	def keyfinder(self,spotname):
+
 		"""
-		Return sorted simulation keys.
+		Decorate the keys_to_filename lookup function so it can be sent to e.g. slice_trajectory.
+		If you are only working with a single spot, then this creates the file-name inference function
+		for all data in that spot.
 		"""
+
+		def keys_to_filename(*args,**kwargs):
+
+			"""
+			After decomposing a list of files into keys that match the regexes in paths.yaml we often 
+			need to reconstitute the original filename.
+			"""
+
+			strict = kwargs.get('strict',True)
+			if not spotname in self.toc: raise Exception('need a spotname to look up keys')
+			#---! it may be worth storing this as a function a la divy_keys
+			#---follow the top,step,part naming convention
+			try:
+				backwards = [''.join(['%s' if i[0]=='subpattern' 
+					else chr(i[1]) for i in re.sre_parse.parse(regex)]) 
+					for regex in [self.spots[spotname][key] for key in ['top','step','part']]]
+				fn = os.path.join(
+					self.spots[spotname]['rootdir'],
+					'/'.join([backwards[ii]%i for ii,i in enumerate(args)]))
+			except:
+				print "ERROR IN KEYS TO FILENAME"
+				import pdb;pdb.set_trace()
+			if strict: assert os.path.isfile(fn)
+			return fn
+
+		return keys_to_filename
+
+	def divy_keys(self,spotname):
+
+		"""
+		The treeparser matches trajectory files with a combined regex. 
+		This function prepares a lambda that divides the combined regex into parts and reduces them to 
+		strings if there is only one part. The resulting regex groups serve as keys in the toc.
+		"""
+
+		group_counts = [sum([i[0]=='subpattern' 
+			for i in re.sre_parse.parse(self.spots[spotname][key])]) 
+			#---apply naming convention
+			for key in ['top','step','part']]
+		cursor = ([0]+[sum(group_counts[:i+1]) for i in range(len(group_counts))])
+		slices = [slice(cursor[i],cursor[i+1]) for i in range(len(cursor)-1)]
+		divy = lambda x: [y[0] if len(y)==1 else y for y in [x[s] for s in slices]]
+		return divy
+
+	def prefixer(self,sn,spot=None):
+
+		"""
+		Choose a prefix for naming post-processing files.
+		"""
+
+		#---! the spotname is a tuple which must be converted to string to be sent to the namer as spot
+		#---! the following hack should be replaced once you figure out what to do with the suffixes
+		spotnamer = lambda spotname,suffix : '%s_%s'%(spotname,suffix) if suffix else spotname 
+		if spot: prefix = self.spots[spot]['namer'](spot,sn)
+		else: prefix = self.spots[self.cursor]['namer'](spotnamer(*self.cursor),sn)
+		return prefix
 		
-		try: keys = [self.toc.keys()[j] for j in 
-			argsort(map(lambda x:int(re.findall('^.+-v([0-9]+)',x)[0]),self.toc.keys()))]
-		except: keys = self.toc.keys()
-		return keys
+	###---DATASET PARSER
 
-	def collection(self,*args,**kwargs):
+	def treeparser(self,spotname):
 
 		"""
-		Return simulation keys from a collection.
+		This function parses simulation data which are organized into a "spot". 
+		It writes the filenames to the table of contents (self.toc).
 		"""
 
-		calcname = kwargs.get('calcname',None)
-		if args and calcname: raise Exception('\n[ERROR] self.collection takes either calcname or name')
-		elif not calcname:
-			return list(unique(flatten([self.vars['collections'][i] for i in args])))
-		elif calcname: 
-			collections = self.calc[calcname]['collections']
-			if type(collections)==str: collections = [collections]
-			return list(unique(flatten([self.vars['collections'][i] for i in collections])))
-		else: return self.sns()
+		spot = self.spots[spotname]
+		rootdir = spot['rootdir']
+		#---start with all files under rootdir
+		fns = [os.path.join(dirpath,fn) 
+			for (dirpath, dirnames, filenames) 
+			in os.walk(rootdir) for fn in filenames]
+		#---regex combinator is the only place where we enforce a naming convention via top,step,part
+		#---note that we may wish to generalize this depending upon whether it is wise to have three parts
+		regex = ('^%s\/'%re.escape(rootdir.rstrip('/'))+
+			'\/'.join([spot['top'],spot['step'],spot['part']])
+			+'$')
+		matches_raw = [i.groups() for fn in fns for i in [re.search(regex,fn)] if i]
+		if not matches_raw: status('no matches found for spot: "%s"'%spotname,tag='warning')
+		#---first we organize the top,step,part into tuples which serve as keys
+		#---we organize the toc as a doubly-nested dictionary of trajectory parts
+		#---the top two levels of the toc correspond to the top and step signifiers
+		#---note that this procedure projects the top,step,part naming convention into the toc
+		matches = [self.spots[spotname]['divy_keys'](i) for i in matches_raw]
+		self.toc[spotname] = collections.OrderedDict()
+		#---sort the tops into an ordered dictionary
+		for top in sorted(set(zip(*matches)[0])): 
+			self.toc[spotname][top] = collections.OrderedDict()
+		#---collect unique steps for each top and load them with the parts
+		for top in self.toc[spotname]:
+			#---sort the steps into an ordered dictionary
+			for step in sorted(set([i[1] for i in matches if i[0]==top])):
+				#---we sort the parts into an ordered dictionary
+				#---this is the leaf of the toc tree and we use dictionaries
+				parts = sorted([i[2] for i in matches if i[0]==top and i[1]==step])
+				self.toc[spotname][top][step] = collections.OrderedDict([(part,{}) for part in parts])
+		#---now the toc is prepared with filenames but subsequent parsings will identify EDR files
 
-	def get_files(self,sn,calcname=None,slice_name=None,group=None):
-
-		"""
-		Given a simulation, slice_name, and group name, return the paths.
-		Note that this function should replace similar codes throughout workspace.py and computer.py.
-		Note that group and slice_name override either in the calculations.
-		"""
-
-		if calcname: 
-			if not group: group = self.calc[calcname]['group']
-			if not slice_name: slice_name = self.calc[calcname]['slice_name']
-		return [self.slices[sn][slice_name][group][key] for key in ['gro','xtc']]
-
-	def shortname(self,sn,prefix=False):
-
-		"""
-		If a 'shortname' key is placed in parse_specs then we can use this rule to shorten the name of 
-		simulations when writing files associated with them.
-		"""
-
-		code = re.findall(self.shortname_regex,sn)[0]
-		if not prefix: return code
-		else: return ('v' if self.shortname(sn).isdigit() else '')+code
-
-	def key_recon(self,toc='toc'):
-	
-		"""
-		Returns a function which reconstitutes a set of keys from the atomized ones.
-		"""
-	
-		cumsum = lambda x: [sum(x[:i]) for i in range(len(x)+1)]
-		chunk = lambda ulist,step: map(lambda i: ulist[i:i+step],xrange(0,len(ulist),step))
-		inds = chunk([int(cumsum(self.datahead[toc]['counts'])[i])
-			for i in map(lambda x:int(x/2.),range((len(self.datahead[toc]['counts'])+1)*2))[1:-1]],2)
-		return lambda t: tuple([unescape(self.datahead[toc]['write'][xx]%tuple(t[slice(x[0],x[1])])) 
-			for xx,x in enumerate(inds)])
-
-	def fullpath(self,*key,**kwargs):
+	def treeparser_edr(self):
 
 		"""
-		Generates a full path relative to the root from the standard regex keys.
+		A special tree parser gets times from edr files.
 		"""
 
-		if any([type(i)!=tuple for i in key]): key = tupleflat(key)
-		path = '/'.join(self.key_recon(**kwargs)(key))
-		return path
+		#---perform this operation on any spotnames with a part named "edr"
+		spotnames_edr = [i for i in self.spots.keys() if i[1]=='edr']
+		#---prepare a list of edr files to parse first
+		targets = []
+		for spotname in spotnames_edr:
+			for sn in self.toc[spotname].keys():
+				steps = self.toc[spotname][sn].keys()
+				for step in steps:
+					parts = self.toc[spotname][sn][step].keys()
+					for part in parts:
+						fn = self.keyfinder(spotname)(sn,step,part)
+						keys = (spotname,sn,step,part)
+						targets.append((fn,keys))
+		for ii,(fn,keys) in enumerate(targets):
+			status('scanning EDR files',i=ii,looplen=len(targets),tag='scan')
+			times = edrcheck(fn)
+			leaf = delve(self.toc,*keys)
+			leaf['start'],leaf['stop'] = times
 
-	def lookup(self,*args,**kwargs):
-
-		"""
-		Perform a lookup with variable substitutions
-		NOTE THAT THIS SCHEME LETS SPECS FILES BECOME SELF-REFERENTIAL
-		"""
-		
-		logic = ''
-		result = delve(self.__dict__,*args)
-		#---if the result is a leaf node but can be found in self.vars we continue to substitute
-		if args[-1] in self.vars:
-			over = delve(self.vars,args[-1])
-			if result.__hash__ != None and result in over: 
-				logic += '>'+str(result)
-				result = over[result]
-		#---if the result is not a leaf node we try to traverse further down the tree
-		if type(result)==dict:
-			#---we use the simulation name to check the meta dictionary values for a descriptor
-			if 'sn' in kwargs:
-				match_meta = [i for i in self.meta[kwargs['sn']].values() if i in result]
-				#---search for values in the meta dictionary for a particular simulation to traverse
-				if len(match_meta)==1:
-					result = result[match_meta[0]] 
-					logic += '>'+str(match_meta[0])
-		summary = {'args':args,'logic':logic}
-		if kwargs != {}: summary['kwargs'] = kwargs
-		self.lookups.append(summary)
-		return result
-
-	def clear_lookups(self): self.lookups = []
-
-	def path(self,name):
+	def get_timeseries(self,sn,strict=False,**kwargs):
 
 		"""
-		Return completed, absolute paths.
+		Typically EDR times are stored in the toc for a particular spot. 
+		This function retrieves the sequence from the spot that corresponds to the parsed edr data 
+		for either the active spot denoted by the cursor or a user-supplied spot from kwargs.
 		"""
 
-		return os.path.join(os.path.abspath(os.path.expanduser(self.paths[name])),'')
+		spotname = kwargs.get('spotname',self.cursor)
+		#---! get the default spotname and get the edr part 
+		assert (spotname[0],'edr') in self.toc
+		edrtree = self.toc[(spotname[0],'edr')][sn]
+		#---naming convention
+		sequence = [((sn,step,part),tuple([edrtree[step][part][key] 
+			for key in ['start','stop']]))
+			for step in edrtree 
+			for part in edrtree[step]]
+		#---return a list of keys,times pairs
+		return sequence
+		#---! discarded logic below
+		#seq_key_fn = [((sn,sub,fn),self.fullpath(sn,sub,fn)) for sub in subs for fn in self.toc[sn][sub]]
+		#seq_time_fn = [(self.edr_times[self.xtc_files.index(fn)],key) for key,fn in seq_key_fn
+		#	if not strict or (None not in self.edr_times[self.xtc_files.index(fn)])]
+		#return seq_time_fn
 
-	#---MDAnalysis 
-
-	def gmxread(self,grofile,trajfile=None):
-
-		"""
-		Read a simulation trajectory
-		"""
-
-		import MDAnalysis
-		if trajfile == None: uni = MDAnalysis.Universe(grofile)
-		else: uni = MDAnalysis.Universe(grofile,trajfile)
-		return uni
-	
-	def mdasel(self,uni,select): 
-
-		"""
-		Make a selection in MDAnalysis regardless of version.
-		"""
-
-		if hasattr(uni,'select_atoms'): return uni.select_atoms(select)
-		else: return uni.selectAtoms(select)
-	
-	def get_regex_groups(self,toc):
-	
-		"""
-		Given a regex definition for parsing files we extract some rules for later.
-		"""
-		
-		regex = self.datahead[toc]['regex']
-		regex_groups = []
-		for count,r in enumerate(regex):
-			regex_backwards = str(r)
-			for key in re.findall('(\([^\)]+\))',r):
-				regex_backwards = re.sub(re.escape(key),'%s',regex_backwards)
-			regex_groups.append([regex_backwards.count('%s'),regex_backwards])
-		self.datahead[toc]['counts'],self.datahead[toc]['write'] = zip(*regex_groups)
-		
-	#---DATASET PARSER
-			
-	def treeparser(self,tocname,sort=True):
-	
-		"""
-		For a particular table-of-contents specification, parse the root directory.
-		"""
-		
-		regexs = regex_top,regex_sub,regex_fn = self.datahead[tocname]['regex']
-		regex = '^%s\/'%re.escape(
-			self.rootdir if self.rootdir[-1]!='/' else self.rootdir[:-1]
-			)+'\/'.join([regex_top,regex_sub,regex_fn])+'$'
-		#---parse all files under the root
-		fns = []
-		for (dirpath, dirnames, filenames) in os.walk(self.rootdir):
-			fns.extend([dirpath+'/'+fn for fn in filenames])			
-		#---collect matching files
-		reassemble = self.key_recon(tocname)
-		matches = [reassemble(re.findall(regex,fn)[0]) for fn in fns if re.match(regex,fn)]
-		if matches == []: raise Exception('[ERROR] failed to find matches')
-		#---toc is a nested dictionary of the available top directories and subdirectories
-		#---note that if we wanted tuples as keys in newtoc we would use the following code:
-		#---"re.findall(self.datahead['toc']['regex'][0],s)[0]" instead of s below
-		newtoc = dict([(s,
-			dict([(re.findall(regex_sub,t)[0],[]) for t in 
-				set([x[1] for x in matches if x[0]==s])
-				if re.match(regex_sub,t)])
-			) for s in set(list(zip(*matches))[0])])
-		#---load the filenames
-		for dn,sub,fn in matches:
-			if (re.match(regex_sub,sub) and
-				re.match('^%s$'%regex_fn,fn)):
-				newtoc[dn][re.findall(regex_sub,sub)[0]].append(fn)
-		#---sort by number if there is one integer regex group in the filename regex
-		if sort:
-			for sn in newtoc.keys():
-				for sub in newtoc[sn].keys():
-					parts = list(newtoc[sn][sub])
-					newtoc[sn][sub] = [re.findall(self.datahead[tocname]['regex'][2],parts[j])[0]
-						for j in argsort([int(re.findall(self.datahead[tocname]['regex'][2],i)[0]) 
-						for i in parts])]
-		else: 
-			for sn in newtoc.keys():
-				for sub in newtoc[sn].keys():
-					parts = list(newtoc[sn][sub])
-					newtoc[sn][sub] = [re.findall(self.datahead[tocname]['regex'][2],p)[0] for p in parts]
-		setattr(self,tocname,newtoc)
-		
-	def treeparser_xtc_edr(self,tocname):
-	
-		"""
-		compile the toc into a list with full file names for time testing
-		"""
-	
-		toc = self.__dict__[tocname]
-		fns = []
-		for sn in toc.keys():
-			for sub in toc[sn].keys():
-				for fn in toc[sn][sub]: 
-					fns.append(self.fullpath(sn,sub,fn))
-		self.xtc_files = fns
-		edr_times = []
-		for ii,fn in enumerate(fns):
-			status('scanning EDR files',i=ii,looplen=len(fns),tag='scan')
-			edr_times.append([float(i) if i!=None else i for i in edrcheck(self.rootdir+fn)])
-		self.edr_times = edr_times
-		
 	def get_last_start_structure(self,sn,tocname='toc_structures'):
 	
 		"""
 		A function which identifies an original structure for reference.
+		Note that this function requires a spot with a part named "structures" for the right lookup.
 		"""
 		
-		top = self.toc_structures[sn]
-		last_subdir = top.keys()[argsort([int(key[1]) for key in top])[-1]]
-		#---! select the first item in the list
-		struct = (sn,last_subdir,top[last_subdir][0])
-		return self.rootdir+self.fullpath(*struct,toc='toc_structures')
-
-	def sort_steps(self,sn,letters='sut'):
-
-		"""
-		Sort the subdirectory steps by the first group and then the second group which must be an integer.
-		"""
-
-		root = self.toc[sn]
-		ordered = {}
-		for letter in list(set(list(zip(*root.keys()))[0])):
-			keys = [k for k in root if k[0]==letter]
-			ordered[letter] = [keys[j] for j in argsort(map(lambda y:int(y),list(zip(*keys))[1]))]
-		if letter in [None,'']: return ordered
-		else: return [j for k in 
-			[ordered[i] for i in ordered if re.match('^(%s)'%('|'.join(letters)),i)]
-			for j in k]
-			
-	def picture(self,plotname,meta=None):
-	
-		"""
-		Call picturefind with the plot directory from this workspace.
-		"""
-		
-		return picturefind('fig.%s'%plotname,directory=self.paths['post_plot_spot'],meta=meta)
-
-	#---POSTPROCESSING SIMULATIONS
+		assert 'structure' in zip(*self.spots.keys())[1]
+		spotname, = [i for i in self.spots if i[1]=='structure']
+		#---assume we want the structure from the most recent step via sorted (ordered) toc
+		self.toc[('simulations','structure')][sn].items()[-1]
+		step,structures = self.toc[('simulations','structure')][sn].items()[-1]
+		#---since structures should be equivalent we take the first
+		structure = structures.keys()[0]
+		keys = sn,step,structure
+		return self.keyfinder(spotname)(*keys)
 
 	def confirm_file(self,fn):
 	
@@ -425,39 +396,167 @@ class Workspace():
 			ans = raw_input('[QUESTION] is this file valid else quit (y/N)? ')
 			if re.match('^(y|Y)',ans): return True
 			else: raise Exception('\n[ERROR] file was invalid and must be deleted manually:\n%s'%fn)
-			#---! later allow a file deletion if the user says the file is invalid			
+			#---! may want to later allow a file deletion if the user says the file is invalid		
 
-	def select_postdata(self,fn_base,calc,debug=False):
+	###---CREATE GROUPS AND SLICES
+
+	def create_group(self,**kwargs):
 	
 		"""
-		Search postprocess spec files for a match with a calculation.
-		Queries the spec files in order to determine if a calculation has been run already.
-		Also used by store.plot_header to identify the correct data to unpack.
+		Create a group.
 		"""
 
-		for specfn in glob.glob(self.postdir+fn_base+'*.spec'):
-			with open(specfn,'r') as fp: attrs = json.loads(fp.read())
-			if attrs=={} or attrs==calc['specs']: return specfn
-			#---if specs are not identical we compare the ones that are and pass if they are equal
-			chop = deepcopy(attrs)
-			extra_keys = [key for key in chop if key not in calc['specs']]
-			for key in extra_keys: del chop[key]
-			if calc['specs']==chop: return specfn
-		if debug: 
-			import pdb;pdb.set_trace()
-		return None
+		sn = kwargs['sn']
+		name = kwargs['group']
+		select = kwargs['select']
+		cols = 100 if 'cols' not in kwargs else kwargs['cols']
+		#---naming convention holds that the group names follow the prefix and we suffix with ndx
+		simkey = self.prefixer(sn)+'.'+name
+		fn = '%s.ndx'%simkey
+		#---see if we need to make this group
+		if os.path.isfile(self.postdir+fn) and name in self.groups[sn]: return
+		elif os.path.isfile(self.postdir+fn):
+			if self.confirm_file(self.postdir+fn):
+				self.groups[sn][name] = {'fn':fn,'select':select}
+			return
+		status('creating group %s'%simkey,tag='status')
+		#---read the structure
+		uni = gmxread(self.get_last_start_structure(sn))
+		sel = mdasel(uni,select)
+		#---write NDX 
+		import numpy as np
+		iii = sel.indices+1	
+		rows = [iii[np.arange(cols*i,cols*(i+1) if cols*(i+1)<len(iii) else len(iii))] 
+			for i in range(0,len(iii)/cols+1)]
+		with open(self.postdir+fn,'w') as fp:
+			fp.write('[ %s ]\n'%name)
+			for line in rows:
+				fp.write(' '.join(line.astype(str))+'\n')
+		self.groups[sn][name] = {'fn':fn,'select':select}
+
+	def slice(self,sn,**kwargs):
+
+		"""
+		Interface to the slices dictionary. Handles all necessary inferences.
+		Returns a subset of the self.slices dictionary indexed by group names.
+		MORE DOCUMENTATION.
+		"""
+
+		#---default spotname
+		spotname = kwargs.get('spotname',self.cursor)
+		return self.slices[(spotname,sn)]
+
+	def create_slice(self,**kwargs):
+
+		"""
+		Create a slice of a trajectory.
+		"""
+	
+		sn = kwargs['sn']
+		start = kwargs['start']
+		end = kwargs['end']
+		skip = kwargs['skip']
+		group = kwargs['group']
+		slice_name = kwargs['slice_name']
+		pbc = kwargs['pbc'] if 'pbc' in kwargs else None
+		pbc_suffix = '' if not pbc else '.pbc%s'%pbc
+		outkey = '%s.%d-%d-%d.%s%s'%(self.prefixer(sn),start,end,skip,group,pbc_suffix)
+		grofile,trajfile = outkey+'.gro',outkey+'.xtc'
 		
-	def collect_times(self,calc,sn,group):
-	
+		#---make the slice only if necessary
+		both_there = all([os.path.isfile(self.postdir+fn) for fn in [grofile,trajfile]])
+		if both_there and slice_name in self.slice(sn) and group in self.slice(sn)[slice_name]: return
+		if not both_there or not all([self.confirm_file(self.postdir+fn) for fn in [grofile,trajfile]]):
+			status('making slice: %s'%outkey,tag='status')
+			#---slice is not there or not confirmed so we make a new one here
+			sequence = self.get_timeseries(sn,strict=False)
+			traj_toc = self.toc[self.cursor]
+			#---assume the tpr part exists
+			tpr_toc = self.toc[(self.c,'tpr')]
+			try:
+				slice_trajectory(start,end,skip,sequence,outkey,self.postdir,
+					tpr_keyfinder=self.keyfinder((self.c,'tpr')),
+					traj_keyfinder=self.keyfinder(self.cursor),
+					group_fn=self.groups[sn][group]['fn'])
+			except KeyboardInterrupt: raise Exception('[ERROR] cancelled by user')
+			except Exception as e:
+				#---the following exception handler allows the code to continue to slice in case
+				#---...of faulty data but it produces a large quantity of output including a full 
+				#---...traceback to the original exception which also tells you which log files to read
+				#---...to diagnose the error. tested on faulty data. note that the calculator continues
+				#---...but every time you run "make compute" it will hit the error until you solve it
+				exc_type, exc_obj, exc_tb = sys.exc_info()
+				fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+				status('%s in %s at line %d'%(str(exc_type),fname,exc_tb.tb_lineno),tag='error')
+				status('%s'%e,tag='error')
+				import traceback
+				status(re.sub('\n','\n[TRACEBACK] ',traceback.format_exc()),tag='traceback')
+				status('failed to make slice: '+outkey,tag='error')
+				if slice_name not in self.slice(sn): self.slice(sn)[slice_name] = {}
+				self.slice(sn)[slice_name][group] = {'start':start,'end':end,'skip':skip,
+					'group':group,'pbc':pbc,'verified':False,'filekey':outkey,
+					'gro':grofile,'xtc':trajfile,'missing_frame_percent':100.}
+				status('returning from this function but otherwise passing',tag='error')			
+				return
+		print '[STATUS] checking timestamps of slice: %s'%outkey
+		#---slice is made or preexisting and now we validate
+		timeseries = self.slice_timeseries(self.postdir+grofile,self.postdir+trajfile)
+		import numpy as np
+		missing_frame_percent = 1.-len(np.arange(start,end+skip,skip))/float(len(timeseries))
+		if len(timeseries)!=len(np.arange(start,end+skip,skip)): verified = False
+		else:
+			try: verified = all(np.array(timeseries).astype(float)==
+				np.arange(start,end+skip,skip).astype(float))
+			except: verified = False
+		if not verified: status('frame problems in %s'%outkey,tag='warning')
+		if slice_name not in self.slice(sn): self.slice(sn)[slice_name] = {}
+		self.slice(sn)[slice_name][group] = {'start':start,'end':end,'skip':skip,
+			'group':group,'pbc':pbc,'verified':verified,'timeseries':timeseries,'filekey':outkey,
+			'gro':grofile,'xtc':trajfile,'missing_frame_percent':missing_frame_percent}
+
+	def slice_timeseries(self,grofile,trajfile,**kwargs):
+
 		"""
-		Collect the timeseries for one or multiple slices in a calculation.
+		Get the time series from a trajectory slice.
+		The workspace holds very little data that cannot be parsed from specs files.
+		However timeseries data for newly-created slices or perhaps even original sources can be large and
+		somewhat costly to generate for an entire data set. For that reason we dump these to disk. 
+		For now we write the file based on the incoming trajfile name which should refer to new slices in
+		the post directory. In the future we may extend this to sourced trajectories in a "spot".
 		"""
-	
-		if type(calc['slice_name'])==str:
-			return self.slices[sn][calc['slice_name']]['all' if not group else group]['timeseries']
-		else: 
-			return concatenate([self.slices[sn][sname]['all' if not group else group]['timeseries']
-				for sname in calc['slice_name']])
+
+		diskwrite = kwargs.get('diskwrite',self.write_timeseries_to_disk)
+		uni = gmxread(*[os.path.abspath(i) for i in [grofile,trajfile]])
+		timeseries = [uni.trajectory[fr].time for fr in range(len(uni.trajectory))]
+		timefile = os.path.basename(re.sub('\.(xtc|trr)$','.clock',trajfile))
+		store({'timeseries':timeseries},timefile,self.postdir,attrs=None,print_types=False,verbose=True)
+		return timeseries
+			
+	###---INTERPRET SPECIFICATIONS
+
+	def load_specs(self,merge_method='strict'):
+
+		"""
+		A central place where we read all specs files.
+		Note that this is where we implement a new part of the framework in which all files of a particular
+		naming convention are interpreted as specifications and then intelligently merged.
+		This feature allows the user and the factory to create new specs without conflicts and without 
+		overspecifying how these things will work.
+		"""
+
+		import copy
+		specs_files = glob.glob('./calcs/specs/meta*yaml')
+		allspecs = []
+		for fn in specs_files:
+			with open(fn) as fp: allspecs.append(yaml.load(fp.read()))
+		if merge_method=='strict':
+			specs = allspecs.pop(0)
+			for spec in allspecs:
+				for key,val in spec.items():
+					if key not in specs: specs[key] = copy.deepcopy(val)
+					else: raise Exception('\n[ERROR] redundant key %s in more than one meta file'%key)
+		else: raise Exception('\n[ERROR] unclear meta specs merge method %s'%merge_method)
+		return specs
 
 	def interpret_specs(self,details,return_stubs=False):
 
@@ -486,6 +585,7 @@ class Workspace():
 		if sweeps == []: new_calcs = [deepcopy(details)]
 		else: new_calcs = hypothesis(sweeps,default=details_trim)
 		new_calcs_stubs = deepcopy(new_calcs)
+		#import pdb;pdb.set_trace()
 		#---replace non-terminal loop paths with their downstream dictionaries
 		for ii,i in enumerate(nonterms):
 			for nc in new_calcs:
@@ -504,6 +604,68 @@ class Workspace():
 					pivot[i[-2]] = val
 				except: pass
 		return new_calcs if not return_stubs else (new_calcs,new_calcs_stubs)
+
+	###---DOWNSTREAM DATA AND BOOKKEEPING
+
+	def sns(self,**kwargs):
+	
+		"""
+		Return the simulation keys.
+		Note that we previously performed a sort step here but the treeparser does that automatically
+		and the toc is stored in OrderedDict
+		"""
+
+		cursor = kwargs.get('cursor',self.cursor)
+		return self.toc[cursor].keys()
+
+	def collection(self,*args,**kwargs):
+
+		"""
+		Return simulation keys from a collection.
+		"""
+
+		calcname = kwargs.get('calcname',None)
+		if args and calcname: raise Exception('\n[ERROR] self.collection takes either calcname or name')
+		elif not calcname:
+			return list(unique(flatten([self.vars['collections'][i] for i in args])))
+		elif calcname: 
+			collections = self.calc[calcname]['collections']
+			if type(collections)==str: collections = [collections]
+			return list(unique(flatten([self.vars['collections'][i] for i in collections])))
+		#---return all simulations for the current cursor, already sorted by the treeparser and ordered dict
+		else: return self.sns()
+
+	def select_postdata(self,fn_base,calc,debug=False):
+	
+		"""
+		Search postprocess spec files for a match with a calculation.
+		Queries the spec files in order to determine if a calculation has been run already.
+		Also used by store.plot_header to identify the correct data to unpack.
+		"""
+
+		for specfn in glob.glob(self.postdir+fn_base+'*.spec'):
+			with open(specfn,'r') as fp: attrs = json.loads(fp.read())
+			if attrs=={} or attrs==calc['specs']: return specfn
+			#---if specs are not identical we compare the ones that are and pass if they are equal
+			chop = deepcopy(attrs)
+			extra_keys = [key for key in chop if key not in calc['specs']]
+			for key in extra_keys: del chop[key]
+			if calc['specs']==chop: return specfn
+		if debug: 
+			import pdb;pdb.set_trace()
+		return None
+
+	def collect_times(self,calc,sn,group):
+	
+		"""
+		Collect the timeseries for one or multiple slices in a calculation.
+		"""
+	
+		if type(calc['slice_name'])==str:
+			return self.slices[sn][calc['slice_name']]['all' if not group else group]['timeseries']
+		else: 
+			return concatenate([self.slices[sn][sname]['all' if not group else group]['timeseries']
+				for sname in calc['slice_name']])
 
 	def get_post(self,sn,calcname=None,plotname=None,lookup=None):
 
@@ -566,179 +728,28 @@ class Workspace():
 			print "[DEVELOPMENT] need to handle plotnames here"
 			import pdb;pdb.set_trace()
 
-	#---CREATE GROUPS
-		
-	def create_group(self,**kwargs):
-	
-		"""
-		Create a group.
-		"""
+	###---WORKPLACE ACTUATOR
 
-		sn = kwargs['sn']
-		name = kwargs['group']
-		select = kwargs['select']
-		cols = 100 if 'cols' not in kwargs else kwargs['cols']
-		prefix = 'v' if self.shortname(sn).isdigit() else ''
-		simkey = '%s%s.%s'%(prefix,self.shortname(sn),name)
-		fn = '%s.ndx'%simkey
-
-		#---see if we need to make this group
-		if os.path.isfile(self.postdir+fn) and name in self.groups[sn]: return
-		elif os.path.isfile(self.postdir+fn):
-			if self.confirm_file(self.postdir+fn):
-				self.groups[sn][name] = {'fn':fn,'select':select}
-			return
-
-		status('creating group %s'%simkey,tag='status')
-		if 'dry' in kwargs and kwargs['dry']: return
-		#---read the structure
-		uni = self.gmxread(self.get_last_start_structure(sn))
-		sel = self.mdasel(uni,select)
-		#---write NDX 
-		import numpy as np
-		iii = sel.indices+1	
-		rows = [iii[np.arange(cols*i,cols*(i+1) if cols*(i+1)<len(iii) else len(iii))] 
-			for i in range(0,len(iii)/cols+1)]
-		with open(self.postdir+fn,'w') as fp:
-			fp.write('[ %s ]\n'%name)
-			for line in rows:
-				fp.write(' '.join(line.astype(str))+'\n')
-		self.groups[sn][name] = {'fn':fn,'select':select}
-
-	#---CREATE SLICES
-	
-	def slice_timeseries(self,grofile,trajfile):
-
-		"""
-		Get the time series from a trajectory slice.
-		"""
-
-		uni = self.gmxread(*[os.path.abspath(i) for i in [grofile,trajfile]])
-		timeseries = [uni.trajectory[fr].time for fr in range(len(uni.trajectory))]
-		return timeseries
-
-	def get_timeseq(self,sn,strict=False):
-
-		"""
-		One common task is to look up EDR times for a particular simulation.
-		"""
-
-		subs = self.sort_steps(sn)
-		seq_key_fn = [((sn,sub,fn),self.fullpath(sn,sub,fn)) for sub in subs for fn in self.toc[sn][sub]]
-		seq_time_fn = [(self.edr_times[self.xtc_files.index(fn)],key) for key,fn in seq_key_fn
-			if not strict or (None not in self.edr_times[self.xtc_files.index(fn)])]
-		return seq_time_fn
-
-	def get_tpr(self,sn):
-
-		"""
-		Infer the most recent TPR file.
-		"""
-
-		#---! assume the primary data_spot
-		#---! use the XTC toc
-		tpr_fn = self.paths['data_spots'][0]+'/'+re.sub('.xtc','.tpr',
-			self.fullpath(sn,self.sort_steps(sn)[-1],sorted(flatten(self.toc[sn].values()))[-1]))
-		return tpr_fn
-
-	def create_slice(self,**kwargs):
-
-		"""
-		Create a skice of a trajectory.
-		"""
-	
-		dry = kwargs['dry'] if 'dry' in kwargs else False
-		sn = kwargs['sn']
-		start = kwargs['start']
-		end = kwargs['end']
-		skip = kwargs['skip']
-		group = kwargs['group']
-		slice_name = kwargs['slice_name']
-		pbc = kwargs['pbc'] if 'pbc' in kwargs else None
-		prefix='v' if self.shortname(sn).isdigit() else ''
-		outkey = '%s%s.%d-%d-%d.%s%s'%(prefix,self.shortname(sn),start,end,skip,
-			group,'' if pbc==None else '.pbc%s'%pbc)
-		grofile,trajfile = outkey+'.gro',outkey+'.xtc'
-		both_there = all([os.path.isfile(self.postdir+fn) for fn in [grofile,trajfile]])
-		if both_there and slice_name in self.slices[sn] and group in self.slices[sn][slice_name]: return
-		if not both_there or not all([self.confirm_file(self.postdir+fn) for fn in [grofile,trajfile]]):
-			status('making slice: %s'%outkey,tag='status')
-			if not dry:
-				#---slice is not there or not confirmed so we make a new one here
-				seq_time_fn = self.get_timeseq(sn,strict=False)
-				try: slice_trajectory(start,end,skip,seq_time_fn,
-					groupfn=self.postdir+self.groups[sn][group]['fn'],outkey=outkey,pbc=pbc,
-					path=self.fullpath,rootdir=self.rootdir,postdir=self.postdir)
-				except:
-					print "[ERROR] failed to make slice"
-					if slice_name not in self.slices[sn]: self.slices[sn][slice_name] = {}
-					self.slices[sn][slice_name][group] = {'start':start,'end':end,'skip':skip,
-						'group':group,'pbc':pbc,'verified':False,'filekey':outkey,
-						'gro':grofile,'xtc':trajfile,'missing_frame_percent':100.}
-					return
-		print '[STATUS] checking timestamps of slice: %s'%outkey
-		#---slice is made or preexisting and now we validate
-		timeseries = self.slice_timeseries(self.postdir+grofile,self.postdir+trajfile)
-		import numpy as np
-		missing_frame_percent = 1.-len(np.arange(start,end+skip,skip))/float(len(timeseries))
-		if len(timeseries)!=len(np.arange(start,end+skip,skip)): verified = False
-		else:
-			try: verified = all(np.array(timeseries).astype(float)==
-				np.arange(start,end+skip,skip).astype(float))
-			except: verified = False
-		if not verified: status('frame problems in %s'%outkey,tag='warning')
-		if slice_name not in self.slices[sn]: self.slices[sn][slice_name] = {}
-		self.slices[sn][slice_name][group] = {'start':start,'end':end,'skip':skip,
-			'group':group,'pbc':pbc,'verified':verified,'timeseries':timeseries,'filekey':outkey,
-			'gro':grofile,'xtc':trajfile,'missing_frame_percent':missing_frame_percent}
-			
-	#---READ SPECIFICATIONS FILES
-
-	def load_specs(self,merge_method='strict'):
-
-		"""
-		A central place where we read all specs files.
-		Note that this is where we implement a new part of the framework in which all files of a particular
-		naming convention are interpreted as specifications and then intelligently merged.
-		This feature allows the user and the factory to create new specs without conflicts and without 
-		overspecifying how these things will work.
-		"""
-
-		import copy
-		specs_files = glob.glob('./calcs/specs/meta*yaml')
-		allspecs = []
-		for fn in specs_files:
-			with open(fn) as fp: allspecs.append(yaml.load(fp.read()))
-		if merge_method=='strict':
-			specs = allspecs.pop(0)
-			for spec in allspecs:
-				for key,val in spec.items():
-					if key not in specs: specs[key] = copy.deepcopy(val)
-					else: raise Exception('\n[ERROR] redundant key %s in more than one meta file'%key)
-		else: raise Exception('\n[ERROR] unclear meta specs merge method %s'%merge_method)
-		return specs
-
-	def action(self,calculation_name=None,dry=False):
+	def action(self,calculation_name=None):
 	
 		"""
 		Parse a specifications file to make changes to a workspace.
+		This function interprets the specifications and acts on it. 
+		It manages the irreducible units of an omnicalc operation and ensures
+		that the correct data are sent to analysis functions in the right order.
 		"""
 
 		status('parsing specs file',tag='status')
 
 		#---load the yaml specifications file
 		specs = self.load_specs()
-		#---either simulations are placed at the root of the YAML file or in the slices dictionary
-		sns = [key for key in specs if re.match(self.datahead['toc']['regex'][0],key)]
-		if 'slices' in specs:
-			sns += [('slices',key) for key in specs['slices'] 
-				if re.match(self.datahead['toc']['regex'][0],key)]
-
-		#---variables are passed to self.vars
-		if 'variables' in specs:
-			for key,val in specs['variables'].items(): self.vars[key] = val
 		
-		#---replace all terminal nodes with a self-reference
+		#---read simulations from the slices dictionary
+		sns = specs['slices'].keys()
+		#---variables are passed directly to self.vars
+		self.vars = deepcopy(specs['variables'])
+
+		#---apply "+"-delimited internal references in the yaml file
 		for path,sub in [(i,j[-1]) for i,j in catalog(specs) if type(j)==list 
 			and type(j)==str and re.match('^\+',j[-1])]:
 			source = delve(self.vars,*sub.strip('+').split('/'))
@@ -750,18 +761,15 @@ class Workspace():
 			point[path[-1]] = source
 
 		#---loop over all simulations to create groups and slices
-		for route in sns:
+		for route in [('slices',i) for i in sns]:
 			root,sn = delve(specs,*route),route[-1]
-
 			#---create groups
 			if 'groups' in root:
 				for group,select in root['groups'].items():
 					kwargs = {'group':group,'select':select,'sn':sn}
-					if dry: kwargs['dry'] = True
 					self.create_group(**kwargs)
 					self.save(quiet=True)
 				root.pop('groups')
-
 			#---slice the trajectory
 			if 'slices' in root:
 				for sl,details in root['slices'].items(): 
@@ -771,7 +779,6 @@ class Workspace():
 							'end':details['end'],'skip':details['skip'],'slice_name':sl}
 						kwargs['group'] = group
 						if 'pbc' in details: kwargs['pbc'] = details['pbc']
-						if dry: kwargs['dry'] = True
 						self.create_slice(**kwargs)
 						self.save(quiet=True)
 				root.pop('slices')
@@ -824,7 +831,7 @@ class Workspace():
 						sys.path.insert(0,os.path.dirname(search[0]))
 						function = unpacker(search[0],calcname)
 						status('computing %s'%calcname,tag='loop')
-						computer(function,calc=calc,workspace=self,dry=dry)
+						computer(function,calc=calc,workspace=self)
 						self.save()
 					checktime()
 		self.save()

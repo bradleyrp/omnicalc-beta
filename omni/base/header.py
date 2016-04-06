@@ -25,7 +25,6 @@ if 'nox' in sys.argv:
 	import matplotlib
 	matplotlib.use('Agg')
 if building_docs: sys.path.insert(0,'../../../omni')
-from base.config import bootstrap_gromacs,bootstrap_paths
 from base.workspace import Workspace
 from base.tools import status,unpacker,flatten,unique
 from base.store import picturedat,picturefind,datmerge
@@ -36,7 +35,7 @@ conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
 
 #---get the active workspace
 if 'work' not in globals() and not building_docs :
-	workspace = unpacker(conf_paths,'paths')['workspace_spot']
+	workspace = unpacker(conf_paths)['workspace_spot']
 	work = Workspace(workspace,previous=False)
 
 #---INTERFACE
