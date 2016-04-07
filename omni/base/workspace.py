@@ -596,7 +596,6 @@ class Workspace():
 		if sweeps == []: new_calcs = [deepcopy(details)]
 		else: new_calcs = hypothesis(sweeps,default=details_trim)
 		new_calcs_stubs = deepcopy(new_calcs)
-		#import pdb;pdb.set_trace()
 		#---replace non-terminal loop paths with their downstream dictionaries
 		for ii,i in enumerate(nonterms):
 			for nc in new_calcs:
@@ -829,7 +828,6 @@ class Workspace():
 				details = specs['calculations'][calcname]
 				status('checking calculation %s'%calcname,tag='status')
 				new_calcs = self.interpret_specs(details)
-				import pdb;pdb.set_trace()
 				#---perform calculations
 				for calc in new_calcs:
 					#---find the script with the funtion
