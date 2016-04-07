@@ -21,4 +21,5 @@ outstanding issues
 			recall problems on OSX when running calculations over a tunnel
 			perhaps we should *always* log to the log file and then add a flag that runs it in the background?
 	remove the dry-run behavior entirely
-
+questions
+	do we retain the name "DROPSPOT" in the factory codes because that's what connect.py is calling it

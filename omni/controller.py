@@ -11,7 +11,7 @@ conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
 #---FUNCTIONS
 #-------------------------------------------------------------------------------------------------------------
 
-def compute(calculation_name=None,autoreload=False):
+def compute(calculation_name=None,autoreload=True):
 
 	"""
 	Open the workspace, parse a YAML script with instructions, save, and exit.
@@ -34,7 +34,7 @@ def look(workspace=None,nox=False):
 
 	os.system('python -i ./omni/base/header.py'+(' nox' if nox else ''))
 
-def refresh(autoreload=False):
+def refresh(autoreload=True):
 
 	"""
 	If you have new data or more data (i.e. more XTC files or longer trajectories) you must

@@ -3,7 +3,7 @@
 import matplotlib as mpl 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from numpy import *
+#---! possibly messing up load elsewhere: from numpy import *
 import itertools
 
 """

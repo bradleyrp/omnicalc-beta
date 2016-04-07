@@ -9,14 +9,14 @@ from base.gromacs_interface import gmxread,mdasel,edrcheck,slice_trajectory,mach
 from base.hypothesis import hypothesis
 from base.computer import computer
 from base.timer import checktime
-from base.store import picturefind,store
+from base.store import picturefind,store,load
 from copy import deepcopy
 import MDAnalysis
 
 conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
 
 #---joblib and multiprocessing modules require all functions to be registered in __main__
-for fn in glob.glob('calcs/codes/*.py'): execfile(fn)
+# WHAT WAS I THINKING? for fn in glob.glob('calcs/codes/*.py'): execfile(fn)
 
 #---CLASS
 #-------------------------------------------------------------------------------------------------------------
@@ -56,7 +56,6 @@ class Workspace():
 		Note that we initialize paths.yaml and superficial data first, then load from the workspace or
 		parse the dataset if the workspace was not saved.
 		"""
-
 		self.filename = path_expand(fn)
 		self.paths = unpacker(conf_paths)
 		self.machine = unpacker(conf_gromacs,'machine_configuration')[machine_name]
@@ -525,11 +524,22 @@ class Workspace():
 		the post directory. In the future we may extend this to sourced trajectories in a "spot".
 		"""
 
-		diskwrite = kwargs.get('diskwrite',self.write_timeseries_to_disk)
-		uni = gmxread(*[os.path.abspath(i) for i in [grofile,trajfile]])
-		timeseries = [uni.trajectory[fr].time for fr in range(len(uni.trajectory))]
 		timefile = os.path.basename(re.sub('\.(xtc|trr)$','.clock',trajfile))
-		store({'timeseries':timeseries},timefile,self.postdir,attrs=None,print_types=False,verbose=True)
+		diskwrite = kwargs.get('diskwrite',self.write_timeseries_to_disk)
+		timefile_exists = os.path.isfile(os.path.join(self.postdir,timefile))
+		if timefile_exists and not self.autoreload and diskwrite: 
+			status('removing clock file because autoreload=False and diskwrite=True',tag='warning')
+			os.remove(timefile)
+		if timefile_exists and self.autoreload:
+			#---load the clockfile instead of parsing the XTC file
+			dat = load(timefile,path=self.postdir)
+			timeseries = dat['timeseries']
+		else:
+			uni = gmxread(*[os.path.abspath(i) for i in [grofile,trajfile]])
+			timeseries = [uni.trajectory[fr].time for fr in range(len(uni.trajectory))]
+			if diskwrite: 
+				store({'timeseries':timeseries},timefile,self.postdir,
+					attrs=None,print_types=False,verbose=True)
 		return timeseries
 			
 	###---INTERPRET SPECIFICATIONS
@@ -582,6 +592,7 @@ class Workspace():
 			pivot['loop'] = base['loop'].keys()
 		#---hypothesize over the reduced specifications dictionary
 		sweeps = [{'route':i[:-1],'values':j} for i,j in catalog(details_trim) if 'loop' in i]
+		#---! note that you cannot have loops within loops (yet?) but this would be the right place for it
 		if sweeps == []: new_calcs = [deepcopy(details)]
 		else: new_calcs = hypothesis(sweeps,default=details_trim)
 		new_calcs_stubs = deepcopy(new_calcs)
@@ -818,6 +829,7 @@ class Workspace():
 				details = specs['calculations'][calcname]
 				status('checking calculation %s'%calcname,tag='status')
 				new_calcs = self.interpret_specs(details)
+				import pdb;pdb.set_trace()
 				#---perform calculations
 				for calc in new_calcs:
 					#---find the script with the funtion
