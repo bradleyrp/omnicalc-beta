@@ -43,6 +43,7 @@ def computer(function,**kwargs):
 					sn,slice_name,group,mfp),tag='warning')
 				continue
 			new_job['grofile'] = work.postdir+work.slice(sn)[slice_name][group]['gro']
+			#---! xtc must become a flag. recommend 'xtc' becomes work.cursor[1]
 			new_job['trajfile'] = work.postdir+work.slice(sn)[slice_name][group]['xtc']
 		if 'specs' not in calc: calc['specs'] = ''
 		if 'upstream' in calc['specs']:

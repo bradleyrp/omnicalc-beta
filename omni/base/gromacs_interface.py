@@ -106,7 +106,7 @@ def slice_trajectory(start,end,skip,sequence,outkey,postdir,tpr_keyfinder,traj_k
 	#---make a GRO file of the first frame for reference
 	keys,t0 = sources[0]
 	sn,sub,fn = keys
-	traj = traj = traj_keyfinder(*keys)
+	traj = traj_keyfinder(*keys)
 	tail = ' -dump %d -s %s -f %s -o %s.gro%s'%(start,tpr,traj,outkey,group_flag)
 	if pbc != None: tail = tail + ' -pbc %s'%pbc
 	call(gmxpaths['trjconv']+tail,

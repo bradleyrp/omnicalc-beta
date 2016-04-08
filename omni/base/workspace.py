@@ -92,7 +92,7 @@ class Workspace():
 					}
 				self.spots[spotname]['divy_keys'] = self.divy_keys(spotname)
 		#---! note the cursor will have to change later on?
-		assert len(list(set(zip(*self.spots.keys())[0])))==1 #!---DEV
+		# assert len(list(set(zip(*self.spots.keys())[0])))==1 #!---DEV
 		#---! note that you must always have an XTC entry for now
 		assert 'xtc' in zip(*self.spots.keys())[1]
 		#---set a cursor which specifies the active spot which should always be the first in the yaml
@@ -207,7 +207,7 @@ class Workspace():
 
 	###---NAMING
 
-	def keyfinder(self,spotname):
+	def keyfinder(self,spotname=None):
 
 		"""
 		Decorate the keys_to_filename lookup function so it can be sent to e.g. slice_trajectory.
@@ -215,6 +215,7 @@ class Workspace():
 		for all data in that spot.
 		"""
 
+		spotname = self.cursor if not spotname else spotname
 		def keys_to_filename(*args,**kwargs):
 
 			"""
@@ -227,14 +228,14 @@ class Workspace():
 			#---! it may be worth storing this as a function a la divy_keys
 			#---follow the top,step,part naming convention
 			try:
-				backwards = [''.join(['%s' if i[0]=='subpattern' 
-					else chr(i[1]) for i in re.sre_parse.parse(regex)]) 
+				backwards = [''.join(['%s' if i[0]=='subpattern' else chr(i[1]) 
+					for i in re.sre_parse.parse(regex)]) 
 					for regex in [self.spots[spotname][key] for key in ['top','step','part']]]
 				fn = os.path.join(
 					self.spots[spotname]['rootdir'],
 					'/'.join([backwards[ii]%i for ii,i in enumerate(args)]))
 			except:
-				print "ERROR IN KEYS TO FILENAME"
+				raise Exception('error making keys: spotname=%s, keys=%s'%(str(spotname),str(args)))
 				import pdb;pdb.set_trace()
 			if strict: assert os.path.isfile(fn)
 			return fn
@@ -285,14 +286,16 @@ class Workspace():
 		#---start with all files under rootdir
 		fns = [os.path.join(dirpath,fn) 
 			for (dirpath, dirnames, filenames) 
-			in os.walk(rootdir) for fn in filenames]
+			in os.walk(rootdir,followlinks=True) for fn in filenames]
 		#---regex combinator is the only place where we enforce a naming convention via top,step,part
 		#---note that we may wish to generalize this depending upon whether it is wise to have three parts
 		regex = ('^%s\/'%re.escape(rootdir.rstrip('/'))+
 			'\/'.join([spot['top'],spot['step'],spot['part']])
 			+'$')
 		matches_raw = [i.groups() for fn in fns for i in [re.search(regex,fn)] if i]
-		if not matches_raw: status('no matches found for spot: "%s"'%spotname,tag='warning')
+		if not matches_raw: 
+			status('no matches found for spot: "%s,%s"'%spotname,tag='warning')
+			return
 		#---first we organize the top,step,part into tuples which serve as keys
 		#---we organize the toc as a doubly-nested dictionary of trajectory parts
 		#---the top two levels of the toc correspond to the top and step signifiers
@@ -312,7 +315,7 @@ class Workspace():
 				self.toc[spotname][top][step] = collections.OrderedDict([(part,{}) for part in parts])
 		#---now the toc is prepared with filenames but subsequent parsings will identify EDR files
 
-	def treeparser_edr(self):
+	def treeparser_edr(self,spotname):
 
 		"""
 		A special tree parser gets times from edr files.
@@ -345,6 +348,7 @@ class Workspace():
 		for either the active spot denoted by the cursor or a user-supplied spot from kwargs.
 		"""
 
+		self.slice(sn)
 		spotname = kwargs.get('spotname',self.cursor)
 		#---! get the default spotname and get the edr part 
 		assert (spotname[0],'edr') in self.toc
@@ -369,15 +373,13 @@ class Workspace():
 		Note that this function requires a spot with a part named "structures" for the right lookup.
 		"""
 		
-		assert 'structure' in zip(*self.spots.keys())[1]
-		spotname, = [i for i in self.spots if i[1]=='structure']
-		#---assume we want the structure from the most recent step via sorted (ordered) toc
-		self.toc[('simulations','structure')][sn].items()[-1]
-		step,structures = self.toc[('simulations','structure')][sn].items()[-1]
+		#---call slice to move the cursor
+		self.slice(sn)	
+		step,structures = self.toc[self.cursor][sn].items()[-1]
 		#---since structures should be equivalent we take the first
 		structure = structures.keys()[0]
 		keys = sn,step,structure
-		return self.keyfinder(spotname)(*keys)
+		return self.keyfinder()(*keys)
 
 	def confirm_file(self,fn):
 	
@@ -443,7 +445,20 @@ class Workspace():
 
 		#---default spotname
 		spotname = kwargs.get('spotname',self.cursor)
-		return self.slices[(spotname,sn)]
+		#---! assume we are using the default part name 
+		part_name = self.cursor[1]
+		#---search for the simulation in all spots
+		keys_to_sn = [key for key in self.slices.keys() if key[1]==sn and key[0][1]==part_name]
+		if len(keys_to_sn)>1: raise Exception('found simulation %s in multiple spots!'%sn)
+		unique_key = keys_to_sn[0]
+		if unique_key[0] != self.cursor:
+			self.cursor = unique_key[0]
+			status('moving cursor to %s,%s'%self.cursor,tag='status')
+			#---! needs concerted motion of cursor/c
+			self.c = self.cursor[0]
+		if unique_key not in self.slices: 
+			status('could not find slices for %s (is it in the specs file?)'%str(unique_key))
+		return self.slices[unique_key]
 
 	def create_slice(self,**kwargs):
 
@@ -473,9 +488,10 @@ class Workspace():
 			#---assume the tpr part exists
 			tpr_toc = self.toc[(self.c,'tpr')]
 			try:
+				#---! note that we force xtc below and this needs a solution ASAP!
 				slice_trajectory(start,end,skip,sequence,outkey,self.postdir,
 					tpr_keyfinder=self.keyfinder((self.c,'tpr')),
-					traj_keyfinder=self.keyfinder(self.cursor),
+					traj_keyfinder=self.keyfinder((self.c,'xtc')),
 					group_fn=self.groups[sn][group]['fn'])
 			except KeyboardInterrupt: raise Exception('[ERROR] cancelled by user')
 			except Exception as e:
@@ -544,7 +560,7 @@ class Workspace():
 			
 	###---INTERPRET SPECIFICATIONS
 
-	def load_specs(self,merge_method='strict'):
+	def load_specs(self,merge_method='careful'):
 
 		"""
 		A central place where we read all specs files.
@@ -565,6 +581,19 @@ class Workspace():
 				for key,val in spec.items():
 					if key not in specs: specs[key] = copy.deepcopy(val)
 					else: raise Exception('\n[ERROR] redundant key %s in more than one meta file'%key)
+		elif merge_method=='careful':
+			#---! recurse only ONE level down in case e.g. calculations is defined in two places but there
+			#...! ...are no overlaps, then this will merge the dictionaries at the top level
+			specs = allspecs.pop(0)
+			for spec in allspecs:
+				for topkey,topval in spec.items():
+					if topkey not in specs: specs[topkey] = copy.deepcopy(topval)
+					else: 
+						for key,val in topval.items():
+							if key not in specs[topkey]: specs[topkey][key] = val
+							else: raise Exception(
+								('[ERROR] performing careful merge in the top-level specs dictionary "%s" '+
+								' but there is already a child key "%s"')%(topkey,key))
 		else: raise Exception('\n[ERROR] unclear meta specs merge method %s'%merge_method)
 		return specs
 
@@ -753,6 +782,7 @@ class Workspace():
 
 		#---load the yaml specifications file
 		specs = self.load_specs()
+		#### status('done loading specs',tag='status')		
 		
 		#---read simulations from the slices dictionary
 		sns = specs['slices'].keys()
@@ -769,8 +799,9 @@ class Workspace():
 			source = delve(self.vars,*sub.strip('+').split('/'))
 			point = delve(specs,*path[:-1])
 			point[path[-1]] = source
-
+		
 		#---loop over all simulations to create groups and slices
+		self.save(quiet=True)
 		for route in [('slices',i) for i in sns]:
 			root,sn = delve(specs,*route),route[-1]
 			#---create groups
@@ -778,7 +809,6 @@ class Workspace():
 				for group,select in root['groups'].items():
 					kwargs = {'group':group,'select':select,'sn':sn}
 					self.create_group(**kwargs)
-					self.save(quiet=True)
 				root.pop('groups')
 			#---slice the trajectory
 			if 'slices' in root:
@@ -790,12 +820,13 @@ class Workspace():
 						kwargs['group'] = group
 						if 'pbc' in details: kwargs['pbc'] = details['pbc']
 						self.create_slice(**kwargs)
-						self.save(quiet=True)
 				root.pop('slices')
 			if root != {}: raise Exception('[ERROR] unprocessed specifications %s'%str(root))
 			else: del root
+		#---we only save after writing all slices. if the slicer fails autoreload will find preexisting files
+		self.save(quiet=True)
 		checktime()
-
+		
 		#---meta is passed to self.meta
 		if 'meta' in specs:
 			for sn in specs['meta']:
@@ -803,7 +834,7 @@ class Workspace():
 
 		#---collections are groups of simulations
 		if 'collections' in specs: self.vars['collections'] = specs['collections']
-		
+
 		#---calculations are executed last and organized in this loop
 		if 'calculations' in specs:
 			status('starting calculations',tag='status')
