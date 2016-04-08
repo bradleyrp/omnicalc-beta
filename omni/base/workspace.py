@@ -315,7 +315,7 @@ class Workspace():
 				self.toc[spotname][top][step] = collections.OrderedDict([(part,{}) for part in parts])
 		#---now the toc is prepared with filenames but subsequent parsings will identify EDR files
 
-	def treeparser_edr(self,spotname):
+	def treeparser_edr(self):
 
 		"""
 		A special tree parser gets times from edr files.
