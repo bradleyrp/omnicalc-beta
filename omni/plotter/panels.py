@@ -3,8 +3,9 @@
 import matplotlib as mpl 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-#---! possibly messing up load elsewhere: from numpy import *
 import itertools
+import numpy as np
+
 
 """
 EXAMPLE LAYOUT 
@@ -42,7 +43,7 @@ def panelplot(layout=None,figsize=(8,8)):
 	outer_grid = gridspec.GridSpec(onrows,oncols,wspace=outer_wspace,hspace=outer_hspace)
 	if 'hratios' in lay['out']: outer_grid.set_height_ratios(lay['out']['hratios'])
 	if 'wratios' in lay['out']: outer_grid.set_width_ratios(lay['out']['wratios'])
-	for ii,spot in enumerate(list(itertools.product(*[arange(i) for i in lay['out']['grid']]))):
+	for ii,spot in enumerate(list(itertools.product(*[np.arange(i) for i in lay['out']['grid']]))):
 		if ii>len(lay['ins'])-1: raise Exception('looks like you have too few ins')
 		hspace = lay['ins'][ii]['hspace'] if 'hspace' in lay['ins'][ii] else None
 		wspace = lay['ins'][ii]['wspace'] if 'wspace' in lay['ins'][ii] else None
@@ -51,7 +52,7 @@ def panelplot(layout=None,figsize=(8,8)):
 		if 'hratios' in lay['ins'][ii]: inner_grid.set_width_ratios(lay['ins'][ii]['hratios'])
 		if 'wratios' in lay['ins'][ii]: inner_grid.set_width_ratios(lay['ins'][ii]['wratios'])
 		inaxs = [fig.add_subplot(j) for j in inner_grid]
-		axpos.append(list(itertools.product(*[arange(i) for i in lay['ins'][ii]['grid']])))
+		axpos.append(list(itertools.product(*[np.arange(i) for i in lay['ins'][ii]['grid']])))
 		axes.append(inaxs)
 	return (axes[0] if len(axes)==1 else axes,fig)
 

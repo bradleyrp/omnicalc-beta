@@ -450,6 +450,8 @@ class Workspace():
 		#---search for the simulation in all spots
 		keys_to_sn = [key for key in self.slices.keys() if key[1]==sn and key[0][1]==part_name]
 		if len(keys_to_sn)>1: raise Exception('found simulation %s in multiple spots!'%sn)
+		elif not keys_to_sn: raise Exception('failed to find key for sn "%s" and part "%s"'%(sn,part_name)+
+			'this might happen if you are missing that simulation or the "spot" that holds it')
 		unique_key = keys_to_sn[0]
 		if unique_key[0] != self.cursor:
 			self.cursor = unique_key[0]
