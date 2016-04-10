@@ -4,7 +4,7 @@ import sys,os,re,time,glob
 import yaml
 import pickle,json,copy,glob,signal,collections
 from base.tools import unpacker,path_expand,status,argsort,unescape,tupleflat
-from base.tools import delve,asciitree,catalog,status,unique,flatten
+from base.tools import delve,asciitree,catalog,status,unique,flatten,tracer
 from base.gromacs_interface import gmxread,mdasel,edrcheck,slice_trajectory,machine_name
 from base.hypothesis import hypothesis
 from base.computer import computer
@@ -234,8 +234,9 @@ class Workspace():
 				fn = os.path.join(
 					self.spots[spotname]['rootdir'],
 					'/'.join([backwards[ii]%i for ii,i in enumerate(args)]))
-			except:
-				raise Exception('error making keys: spotname=%s, keys=%s'%(str(spotname),str(args)))
+			except Exception as e: 
+				tracer(e)
+				#raise Exception('error making keys: spotname=%s, keys=%s'%(str(spotname),str(args)))
 				import pdb;pdb.set_trace()
 			if strict: assert os.path.isfile(fn)
 			return fn

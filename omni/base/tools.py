@@ -203,7 +203,7 @@ def framelooper(total,start=None,text='frame'):
 		status(text,i=fr,looplen=total,tag='parallel',start=start)
 		yield fr
 
-def tracer(e):
+def tracer_deprecated(e):
 
 	"""
 	Print a traceback and continue. Use this with exceptions.
@@ -212,3 +212,16 @@ def tracer(e):
 	s = traceback.format_exc()
 	print "[TRACE] > "+"\n[TRACE] > ".join(s.split('\n'))
 	print "[ERROR] failed to make slice"
+
+def tracer(e,all=True,exit=False):
+
+	"""
+	Report an error concisely to the terminal to avoid overwhelming the user.
+	"""
+
+	exc_type, exc_obj, exc_tb = sys.exc_info()
+	fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+	status('%s in %s at line %d'%(str(exc_type),fname,exc_tb.tb_lineno),tag='error')
+	status('%s'%e,tag='error')
+	if all: status(re.sub('\n','\n[TRACEBACK] ',traceback.format_exc()),tag='traceback')
+	if exit: sys.exit(1)
