@@ -375,7 +375,7 @@ class Workspace():
 		"""
 		
 		#---call slice to move the cursor
-		self.slice(sn)	
+		self.slice(sn,part_name='structure')
 		step,structures = self.toc[self.cursor][sn].items()[-1]
 		#---since structures should be equivalent we take the first
 		structure = structures.keys()[0]
@@ -446,13 +446,14 @@ class Workspace():
 
 		#---default spotname
 		spotname = kwargs.get('spotname',self.cursor)
-		#---! assume we are using the default part name 
-		part_name = self.cursor[1]
+		part_name = kwargs.get('part_name',self.cursor[1])
 		#---search for the simulation in all spots
 		keys_to_sn = [key for key in self.slices.keys() if key[1]==sn and key[0][1]==part_name]
 		if len(keys_to_sn)>1: raise Exception('found simulation %s in multiple spots!'%sn)
-		elif not keys_to_sn: raise Exception('failed to find key for sn "%s" and part "%s"'%(sn,part_name)+
-			'this might happen if you are missing that simulation or the "spot" that holds it')
+		elif not keys_to_sn: 
+			raise Exception('failed to find key for sn "%s" and part "%s". '%(sn,part_name)+
+				'this might happen if you are missing that simulation or the "spot" that holds it. '+
+				'the cursor is "%s" and the spotname is "%s"'%(self.cursor,self.c))
 		unique_key = keys_to_sn[0]
 		if unique_key[0] != self.cursor:
 			self.cursor = unique_key[0]
@@ -482,6 +483,7 @@ class Workspace():
 		
 		#---make the slice only if necessary
 		both_there = all([os.path.isfile(self.postdir+fn) for fn in [grofile,trajfile]])
+		self.slice(sn,part_name='xtc')
 		if both_there and slice_name in self.slice(sn) and group in self.slice(sn)[slice_name]: return
 		if not both_there or not all([self.confirm_file(self.postdir+fn) for fn in [grofile,trajfile]]):
 			status('making slice: %s'%outkey,tag='status')
