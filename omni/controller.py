@@ -47,7 +47,7 @@ def refresh(autoreload=True):
 	work.bootstrap()
 	work.save()
 	
-def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
+def plot(plotname=None,nox=False,workspace=None,specfile=None,log=False,**kwargs):
 
 	"""
 	Run a plotting routine.
@@ -87,10 +87,11 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,**kwargs):
 		if len(search)!=1: status('unclear search for %s: %s'%(pname,str(search)))
 		else: 
 			if plotname==None: 
-				cmd = 'python '+search[0]+' nox quit=True '+' "%s"'%str(kwargs)+' &> log'
+				cmd = 'python '+search[0]+' nox quit=True '+' "%s"'%str(kwargs)+(' &> log' if log else '')
 			else: 
 				status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
 				cmd = "python -i "+search[0]+(' nox' if nox else '')+' "%s"'%str(kwargs)
+				#---! add log here? is the user or factory ever going to use this?
 			status('calling: "%s"'%cmd,tag='status')
 			os.system(cmd)
 

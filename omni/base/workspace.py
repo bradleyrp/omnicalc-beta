@@ -792,7 +792,7 @@ class Workspace():
 		#---read simulations from the slices dictionary
 		sns = specs['slices'].keys()
 		#---variables are passed directly to self.vars
-		self.vars = deepcopy(specs['variables'])
+		self.vars = deepcopy(specs['variables']) if 'variables' in specs else {}
 
 		#---apply "+"-delimited internal references in the yaml file
 		for path,sub in [(i,j[-1]) for i,j in catalog(specs) if type(j)==list 
