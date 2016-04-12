@@ -119,13 +119,19 @@ def export_to_factory(project_name,project_location,workspace=None):
 	import django
 	django.setup()
 	from simulator import models
-	from base.workspace import Workspace
-	#---! rpb sez remove all optional workspace arguments
-	if workspace == None: workspace = unpacker(conf_paths)['workspace_spot']
-	try:
-		work = Workspace(workspace,previous=False)
-		for key in work.toc: models.Simulation(name=key,program="protein",code=key).save()
-	except: print "[STATUS] nothing to export"
+	from base.workspace import Workspace	
+	workspace = unpacker(conf_paths)['workspace_spot']
+	work = Workspace(workspace)
+        sns=list(set([sn for key in work.toc.keys() for sn in work.toc[key]]))
+        for sn in sns:
+		if any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='edr']) and (
+			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='trr']) or
+			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='xtc'])):
+			
+			try:
+				models.Simulation(name=sn,program="protein",code=sn).save()
+			except: pass
+	if not sns: print "[STATUS] nothing to export"
 
 def pipeline(script,nox=False):
 
