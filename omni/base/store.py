@@ -126,6 +126,7 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 				#---slices in plotspecs or lookup from variables with plus-syntax
 				#---! need to allow blank slices here so that the machine looks to calcs to get them
 				if 'slices' in plotspecs and not re.match('^\+',plotspecs['slices']): 
+					work.cursor = (work.c,work.trajectory_format)
 					sl = work.slice(sn)[plotspecs['slices']]['all' if not group else group]
 				elif 'slices' in plotspecs: 
 					sl = deepcopy(delve(work.vars,*plotspecs['slices'].strip('+').split('/')))

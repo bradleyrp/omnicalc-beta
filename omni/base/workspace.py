@@ -99,6 +99,8 @@ class Workspace():
 		self.cursor = self.spots.keys()[0]
 		#---the self.c variable holds the top spot name but not the part name
 		self.c = self.cursor[0]
+		#---! default to XTC
+		self.trajectory_format = 'xtc'
 		
 		#---open self if the filename exists 
 		#---note that we save parser results but not details from paths.yaml in case these change
