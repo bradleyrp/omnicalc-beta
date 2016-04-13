@@ -93,7 +93,7 @@ class Workspace():
 					}
 				self.spots[spotname]['divy_keys'] = self.divy_keys(spotname)
 		#---we always require an xtc entry in the parts list
-		if 'xtc' in zip(*self.spots.keys())[1]: 
+		if 'xtc' not in zip(*self.spots.keys())[1]: 
 			raise Exception('\n[ERROR] you must have "xtc" in the parts list')
 		#---set a cursor which specifies the active spot which should always be the first in the yaml
 		self.cursor = self.spots.keys()[0]
