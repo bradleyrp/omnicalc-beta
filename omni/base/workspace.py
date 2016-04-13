@@ -78,7 +78,8 @@ class Workspace():
 		self.spots,self.toc = {},collections.OrderedDict()
 		for name,details in self.paths['spots'].items():
 			rootdir = os.path.join(details['route_to_data'],details['spot_directory'])
-			assert os.path.isdir(rootdir)
+			if not os.path.isdir(rootdir):
+				raise Exception('\n[ERROR] cannot find root directory %s'%rootdir)
 			for part_name,part_regex in details['regexes']['part'].items():
 				spotname = (name,part_name)
 				self.toc[spotname] = {}
@@ -91,10 +92,9 @@ class Workspace():
 					'namer_text':details['namer'],
 					}
 				self.spots[spotname]['divy_keys'] = self.divy_keys(spotname)
-		#---! note the cursor will have to change later on?
-		# assert len(list(set(zip(*self.spots.keys())[0])))==1 #!---DEV
-		#---! note that you must always have an XTC entry for now
-		assert 'xtc' in zip(*self.spots.keys())[1]
+		#---we always require an xtc entry in the parts list
+		if 'xtc' in zip(*self.spots.keys())[1]: 
+			raise Exception('\n[ERROR] you must have "xtc" in the parts list')
 		#---set a cursor which specifies the active spot which should always be the first in the yaml
 		self.cursor = self.spots.keys()[0]
 		#---the self.c variable holds the top spot name but not the part name
