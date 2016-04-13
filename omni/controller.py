@@ -47,7 +47,7 @@ def refresh(autoreload=True):
 	work.bootstrap()
 	work.save()
 	
-def plot(plotname=None,nox=False,workspace=None,specfile=None,log=False,**kwargs):
+def plot(plotname=None,nox=False,workspace=None,specfile=None,plotlog=False,**kwargs):
 
 	"""
 	Run a plotting routine.
@@ -57,23 +57,6 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,log=False,**kwargs
 	if plotname == None:
 		from base.workspace import Workspace
 		if workspace == None: workspace = unpacker(conf_paths)['workspace_spot']
-		#---! note that this code is repeated in multiple places and needs consolidation
-		#---! locations include workspace.py,action and store.py,plotload
-		#---! merge is now handled in workspace so this needs removed
-		#---merge automatic calculations here
-		if 0:
-			if 'autocalcs' in specs:
-				for key,val in specs['autocalcs'].items():
-					if key in specs['calculations']: 
-						raise Exception('\n[ERROR] redundant names in calculations and autocalcs: %s'%key+
-							", which is populated with django so check calculator.Calculation")
-					else: specs['calculations'][key] = deepcopy(val)
-			if 'autoplots' in specs:
-				for key,val in specs['autoplots'].items():
-					if key in specs['plots']: 
-						raise Exception('\n[ERROR] redundant names in plots and autoplots: %s'%key+
-							", which is populated with django so check calculator.Calculation")
-					else: specs['plots'][key] = deepcopy(val)
 		work = Workspace(workspace,previous=False)
 		specs = work.load_specs()
 		plotnames = specs['plots'].keys()
@@ -87,7 +70,8 @@ def plot(plotname=None,nox=False,workspace=None,specfile=None,log=False,**kwargs
 		if len(search)!=1: status('unclear search for %s: %s'%(pname,str(search)))
 		else: 
 			if plotname==None: 
-				cmd = 'python '+search[0]+' nox quit=True '+' "%s"'%str(kwargs)+(' &> log' if log else '')
+				cmd = 'python '+search[0]+' nox quit=True '+' "%s"'%str(kwargs)+\
+					(' &> %s'%plotlog if plotlog else '')
 			else: 
 				status('rerun the plot with:\n\nexecfile(\''+search[0]+'\')\n',tag='note')
 				cmd = "python -i "+search[0]+(' nox' if nox else '')+' "%s"'%str(kwargs)
