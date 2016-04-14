@@ -238,8 +238,8 @@ class Workspace():
 					'/'.join([backwards[ii]%i for ii,i in enumerate(args)]))
 			except Exception as e: 
 				tracer(e)
-				#raise Exception('error making keys: spotname=%s, keys=%s'%(str(spotname),str(args)))
-				import pdb;pdb.set_trace()
+				#---previously: raise Exception('error making keys: %s,%s'%(str(spotname),str(args)))
+				import pdb;pdb.set_trace() #---legit
 			if strict: assert os.path.isfile(fn)
 			return fn
 
@@ -699,7 +699,7 @@ class Workspace():
 			for key in extra_keys: del chop[key]
 			if calc['specs']==chop: return specfn
 		if debug: 
-			import pdb;pdb.set_trace()
+			import pdb;pdb.set_trace() #---legit
 		return None
 
 	def collect_times(self,calc,sn,group):
@@ -773,7 +773,7 @@ class Workspace():
 
 		elif plotname:
 			print "[DEVELOPMENT] need to handle plotnames here"
-			import pdb;pdb.set_trace()
+			import pdb;pdb.set_trace() #---legit
 
 	###---WORKPLACE ACTUATOR
 
@@ -834,7 +834,7 @@ class Workspace():
 		#---we only save after writing all slices. if the slicer fails autoreload will find preexisting files
 		self.save(quiet=True)
 		checktime()
-		
+		import pdb;pdb.set_trace()
 		#---meta is passed to self.meta
 		if 'meta' in specs:
 			for sn in specs['meta']:
