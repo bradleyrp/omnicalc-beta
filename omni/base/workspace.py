@@ -369,15 +369,16 @@ class Workspace():
 		#	if not strict or (None not in self.edr_times[self.xtc_files.index(fn)])]
 		#return seq_time_fn
 
-	def get_last_start_structure(self,sn,tocname='toc_structures'):
+	def get_last_start_structure(self,sn,partname='structure'):
 	
 		"""
 		A function which identifies an original structure for reference.
 		Note that this function requires a spot with a part named "structures" for the right lookup.
+		Note that this function needs to be renamed since it can also get TPR files.
 		"""
 		
 		#---call slice to move the cursor
-		self.slice(sn,part_name='structure')
+		self.slice(sn,part_name=partname)
 		step,structures = self.toc[self.cursor][sn].items()[-1]
 		#---since structures should be equivalent we take the first
 		structure = structures.keys()[0]
