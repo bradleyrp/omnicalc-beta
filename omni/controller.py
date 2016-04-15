@@ -101,6 +101,8 @@ def export_to_factory(project_name,project_location,workspace=None):
 	sys.path.insert(0,project_location)
 	os.environ.setdefault("DJANGO_SETTINGS_MODULE",project_name+".settings")
 	import django
+	#---! a fairly extreme hack. this function needs a lot of work. the paths are almost certainly fubar
+	sys.path.insert(0,os.path.join(os.path.abspath(os.path.join(project_location,'../../')),'dev'))
 	django.setup()
 	from simulator import models
 	from base.workspace import Workspace	
@@ -111,7 +113,6 @@ def export_to_factory(project_name,project_location,workspace=None):
 		if any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='edr']) and (
 			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='trr']) or
 			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='xtc'])):
-			
 			try:
 				models.Simulation(name=sn,program="protein",code=sn).save()
 			except: pass
