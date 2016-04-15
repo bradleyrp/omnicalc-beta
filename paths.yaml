@@ -1,68 +1,15 @@
-### OMNICALC PATHS
-
-# write "slices" and postprocessing data to the post_data_spot
-post_data_spot: post
-# plots are written to a separate directory
-post_plot_spot: plot
-# the workspace is represented in a local file
-workspace_spot: workspace
-# omnicalc looks for simulation data in a "spot" containing folders, each of which holds a simulation
-# development! default spot sets the cursor location
-default_spot: Null
-# omnicalc will store timestamps in the workspace but timekeeper tells it to also write them to post
-timekeeper: True 
+default_spot: null
+post_data_spot: /store-omicron/factory/data/project/post/
+post_plot_spot: /store-omicron/factory/data/project/plot/
 spots:
-  # colloquial name for the "spot"
-  simulations:
-    # name downstream postprocessing data according to the spot name (above) and simulation folder (top)
-    # note: that namer is set by default to take a simulation number and save "e.g. v1000.my_calc.dat"
-    # hint: if you have multiple spots then you *must* use spot in the namer or you violate uniqueness
-    namer: "lambda spot,top : 'v'+re.findall('membrane-v([0-9]+)',top)[0]"
-    # parent location of the spot_directory (may be changed if you mount the data elsewhere)
-    route_to_data: /home/rpb/omicron
-    # path of the parent directory for the simulation data
-    # note: that omnicalc joins route_to_data and spot_directory only propagates this information via namer
-    # hint: this means that you can move the data but make sure namer doesn't lose track of the spot
-    spot_directory: dataset-project-ptdins
-    # rules for parsing the data in the spot directories
+  sims:
+    namer: 'lambda spot,top : ''v''+re.findall(''simulation-v([0-9]+)'',top)[0]'
     regexes:
-      # each simulation folder in the spot directory must match the top regex
-      top: '(membrane-v[0-9]+)'
-      # each simulation folder must have trajectories in subfolders that match the step regex (can be null)
-      # note: you must enforce directory structure here with not-slash
-      step: '([stuv])([0-9]+)-([^\/]+)'
-      # each part regex is parsed by omnicalc
-      part: 
-        xtc: 'md\.part([0-9]{4})\.xtc'
-        trr: 'md\.part([0-9]{4})\.trr'
-        edr: 'md\.part([0-9]{4})\.edr'
-        tpr: 'md\.part([0-9]{4})\.tpr'
-        # specify a "structure" part for get_last_start_structure
-        structure: '(system|system-input|structure)\.(gro|pdb)'
-  # colloquial name for an additional "spot"
-  second:
-    # name downstream postprocessing data according to the spot name (above) and simulation folder (top)
-    # note: that namer is set by default to take a simulation number and save "e.g. v1000.my_calc.dat"
-    # hint: if you have multiple spots then you *must* use spot in the namer or you violate uniqueness
-    namer: "lambda spot,top : 'v'+re.findall('membrane-v([0-9]+)',top)[0]"
-    # parent location of the spot_directory (may be changed if you mount the data elsewhere)
-    route_to_data: /home/rpb/omicron
-    # path of the parent directory for the simulation data
-    # note: that omnicalc joins route_to_data and spot_directory only propagates this information via namer
-    # hint: this means that you can move the data but make sure namer doesn't lose track of the spot
-    spot_directory: dataset-project-ptdins-decoy
-    # rules for parsing the data in the spot directories
-    regexes:
-      # each simulation folder in the spot directory must match the top regex
-      top: '(membrane-v[0-9]+)'
-      # each simulation folder must have trajectories in subfolders that match the step regex (can be null)
-      # note: you must enforce directory structure here with not-slash
-      step: '([stuv])([0-9]+)-([^\/]+)'
-      # each part regex is parsed by omnicalc
-      part: 
-        xtc: 'md\.part([0-9]{4})\.xtc'
-        trr: 'md\.part([0-9]{4})\.trr'
-        edr: 'md\.part([0-9]{4})\.edr'
-        tpr: 'md\.part([0-9]{4})\.tpr'
-        # specify a "structure" part for get_last_start_structure
-        structure: '(system|system-input|structure)\.(gro|pdb)'
+      part: {edr: 'md\.part([0-9]{4})\.edr', structure: (system|system-input|structure)\.(gro|pdb),
+        tpr: 'md\.part([0-9]{4})\.tpr', trr: 'md\.part([0-9]{4})\.trr', xtc: 'md\.part([0-9]{4})\.xtc'}
+      step: ([stuv])([0-9]+)-([^\/]+)
+      top: (simulation-v[0-9]+)
+    route_to_data: /store-omicron/factory/data/project
+    spot_directory: sims
+timekeeper: false
+workspace_spot: /store-omicron/factory/data/project/workspace/

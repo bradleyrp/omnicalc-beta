@@ -834,7 +834,7 @@ class Workspace():
 		#---we only save after writing all slices. if the slicer fails autoreload will find preexisting files
 		self.save(quiet=True)
 		checktime()
-		import pdb;pdb.set_trace()
+
 		#---meta is passed to self.meta
 		if 'meta' in specs:
 			for sn in specs['meta']:
