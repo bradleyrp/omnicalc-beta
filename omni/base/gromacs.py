@@ -66,7 +66,7 @@ machine_configuration = machine_configuration[this_machine]
 
 #---modules in LOCAL configuration must be loaded before checking version
 module_path = '/usr/share/Modules/default/init/python.py'
-if 'modules' in machine_configuration:
+if 'modules' in machine_configuration and machine_configuration['modules']:
 	print '[STATUS] found modules in LOCAL configuration'
 	if 'module_path' in machine_configuration: module_path = machine_configuration['module_path']
 	try: execfile(module_path)
