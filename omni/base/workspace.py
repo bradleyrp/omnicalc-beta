@@ -196,7 +196,7 @@ class Workspace():
 		checks += [(('groups',sn,group),val[group]['fn']) 
 			for sn,val in self.groups.items() for group in val]
 		checks += [sl[name][key] for sn,sl in self.slices.items() 
-			for name in sl for key in ['gro','xtc']	if key in sl[name]]
+			for name in sl for key in ['gro',self.trajectory_format] if key in sl[name]]
 		for route,fn in checks:
 			if not os.path.isfile(self.postdir+fn): missing_files.append([route,fn])
 		if missing_files != [] and not scrub: 
@@ -268,11 +268,15 @@ class Workspace():
 		Choose a prefix for naming post-processing files.
 		"""
 
-		#---! the spotname is a tuple which must be converted to string to be sent to the namer as spot
-		#---! the following hack should be replaced once you figure out what to do with the suffixes
-		spotnamer = lambda spotname,suffix : '%s_%s'%(spotname,suffix) if suffix else spotname 
-		if spot: prefix = self.spots[spot]['namer'](spot,sn)
-		else: prefix = self.spots[self.cursor]['namer'](spotnamer(*self.cursor),sn)
+		#---"spot" is a tuple of spotname and the part name
+		#---namer takes the spotname (called spot in the yaml defn of namer) and the simulation name
+		#---we include the partname when accessing self.spots
+		if spot: prefix = self.spots[spot]['namer'](spot[0],sn)
+		else: 
+			#---! the spotname is a tuple which must be converted to string to be sent to the namer as spot
+			#---! the following hack should be replaced once you figure out what to do with the suffixes
+			spotnamer = lambda spotname,suffix : '%s_%s'%(spotname,suffix) if suffix else spotname
+			prefix = self.spots[self.cursor]['namer'](spotnamer(*self.cursor),sn)
 		return prefix
 		
 	###---DATASET PARSER
@@ -482,11 +486,11 @@ class Workspace():
 		pbc = kwargs['pbc'] if 'pbc' in kwargs else None
 		pbc_suffix = '' if not pbc else '.pbc%s'%pbc
 		outkey = '%s.%d-%d-%d.%s%s'%(self.prefixer(sn),start,end,skip,group,pbc_suffix)
-		grofile,trajfile = outkey+'.gro',outkey+'.xtc'
+		grofile,trajfile = outkey+'.gro',outkey+'.'+self.trajectory_format
 		
 		#---make the slice only if necessary
 		both_there = all([os.path.isfile(self.postdir+fn) for fn in [grofile,trajfile]])
-		self.slice(sn,part_name='xtc')
+		self.slice(sn,part_name=self.trajectory_format)
 		if both_there and slice_name in self.slice(sn) and group in self.slice(sn)[slice_name]: return
 		if not both_there or not all([self.confirm_file(self.postdir+fn) for fn in [grofile,trajfile]]):
 			status('making slice: %s'%outkey,tag='status')
@@ -499,7 +503,7 @@ class Workspace():
 				#---! note that we force xtc below and this needs a solution ASAP!
 				slice_trajectory(start,end,skip,sequence,outkey,self.postdir,
 					tpr_keyfinder=self.keyfinder((self.c,'tpr')),
-					traj_keyfinder=self.keyfinder((self.c,'xtc')),
+					traj_keyfinder=self.keyfinder((self.c,self.trajectory_format)),
 					group_fn=self.groups[sn][group]['fn'])
 			except KeyboardInterrupt: raise Exception('[ERROR] cancelled by user')
 			except Exception as e:
@@ -518,7 +522,7 @@ class Workspace():
 				if slice_name not in self.slice(sn): self.slice(sn)[slice_name] = {}
 				self.slice(sn)[slice_name][group] = {'start':start,'end':end,'skip':skip,
 					'group':group,'pbc':pbc,'verified':False,'filekey':outkey,
-					'gro':grofile,'xtc':trajfile,'missing_frame_percent':100.}
+					'gro':grofile,self.trajectory_format:trajfile,'missing_frame_percent':100.}
 				status('returning from this function but otherwise passing',tag='error')			
 				return
 		print '[STATUS] checking timestamps of slice: %s'%outkey
@@ -535,7 +539,7 @@ class Workspace():
 		if slice_name not in self.slice(sn): self.slice(sn)[slice_name] = {}
 		self.slice(sn)[slice_name][group] = {'start':start,'end':end,'skip':skip,
 			'group':group,'pbc':pbc,'verified':verified,'timeseries':timeseries,'filekey':outkey,
-			'gro':grofile,'xtc':trajfile,'missing_frame_percent':missing_frame_percent}
+			'gro':grofile,self.trajectory_format:trajfile,'missing_frame_percent':missing_frame_percent}
 
 	def slice_timeseries(self,grofile,trajfile,**kwargs):
 

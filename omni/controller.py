@@ -105,16 +105,23 @@ def export_to_factory(project_name,project_location,workspace=None):
 	sys.path.insert(0,os.path.join(os.path.abspath(os.path.join(project_location,'../../')),'dev'))
 	django.setup()
 	from simulator import models
-	from base.workspace import Workspace	
+	from base.workspace import Workspace
 	workspace = unpacker(conf_paths)['workspace_spot']
 	work = Workspace(workspace)
-        sns=list(set([sn for key in work.toc.keys() for sn in work.toc[key]]))
-        for sn in sns:
+	sns={}
+	for key in work.toc.keys():
+		for sn in work.toc[key]:
+			sns[sn]=key[0]
+        for sn in sns.keys():
 		if any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='edr']) and (
 			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='trr']) or
 			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='xtc'])):
+			spot=(sns[sn],'edr')
+			print spot, sn                   
+			name=work.prefixer(sn,spot=spot)
+                        print spot, sn, name
 			try:
-				models.Simulation(name=sn,program="protein",code=sn).save()
+				models.Simulation(name=name,program="protein",code=sn).save()
 			except: pass
 	if not sns: print "[STATUS] nothing to export"
 
