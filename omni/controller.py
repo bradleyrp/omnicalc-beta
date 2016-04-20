@@ -123,17 +123,14 @@ def export_to_factory(project_name,project_location,workspace=None):
 	for key in work.toc.keys():
 		for sn in work.toc[key]:
 			sns[sn]=key[0]
-        for sn in sns.keys():
+	for sn in sns.keys():
 		if any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='edr']) and (
 			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='trr']) or
 			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='xtc'])):
 			spot=(sns[sn],'edr')
-			print spot, sn                   
 			name=work.prefixer(sn,spot=spot)
-                        print spot, sn, name
-			try:
-				models.Simulation(name=name,program="protein",code=sn).save()
-			except: pass
+			try: models.Simulation(name=name,program="protein",code=sn).save()
+			except: print '[NOTE] simulation "%s" already exists in the database'%name
 	if not sns: print "[STATUS] nothing to export"
 
 def pipeline(script,nox=False):
