@@ -53,7 +53,7 @@ def default_paths():
 	Show the user a copy of paths.yaml.
 	"""
 
-	if not os.path.isfile('paths.yaml'):
+	if os.path.isfile('paths.yaml'):
 		raise Exception('[ERROR] found paths.yaml and refusing to overwrite with '+\
 			'the default, which you can find at omni/base/default_paths.yaml')
 	else: shutil.copyfile('omni/base/default_paths.yaml','paths.yaml')
