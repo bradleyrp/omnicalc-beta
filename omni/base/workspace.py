@@ -81,9 +81,9 @@ class Workspace():
 			if not os.path.isdir(rootdir):
 				raise Exception('\n[ERROR] cannot find root directory %s'%rootdir)
 			for part_name,part_regex in details['regexes']['part'].items():
-				spotname = (name,part_name)
-				self.toc[spotname] = {}
-				self.spots[spotname] = {
+				spot = (name,part_name)
+				self.toc[spot] = {}
+				self.spots[spot] = {
 					'rootdir':os.path.join(rootdir,''),
 					'top':details['regexes']['top'],
 					'step':details['regexes']['step'],
@@ -91,7 +91,7 @@ class Workspace():
 					'namer':eval(details['namer']),
 					'namer_text':details['namer'],
 					}
-				self.spots[spotname]['divy_keys'] = self.divy_keys(spotname)
+				self.spots[spot]['divy_keys'] = self.divy_keys(spot)
 		#---we always require an xtc entry in the parts list
 		if 'xtc' not in zip(*self.spots.keys())[1]: 
 			raise Exception('\n[ERROR] you must have "xtc" in the parts list')
@@ -120,7 +120,7 @@ class Workspace():
 		if not os.path.isdir(self.postdir): os.mkdir(self.postdir)
 		if not os.path.isdir(self.plotdir): os.mkdir(self.plotdir)
 		#---parse the simulations found in each "spot"
-		for spotname in self.spots: self.treeparser(spotname)
+		for spot in self.spots: self.treeparser(spot)
 		#---if there is a part named edr then we use it to get simulation times
 		#---! edr files are required to infer times for slicing however we might also use xtc or trr later
 		assert 'edr' in zip(*self.spots.keys())[1]
@@ -132,8 +132,8 @@ class Workspace():
 		for key in ['post','groups','slices']:
 			if key not in self.members_with_specific_parts:
 				self.__dict__[key] = {i:{} for i in all_top_keys}
-			else: self.__dict__[key] = {(spotname,i):{} 
-				for spotname in self.toc for i in self.toc[spotname]}
+			else: self.__dict__[key] = {(spot,i):{} 
+				for spot in self.toc for i in self.toc[spot]}
 		self.save()
 
 	def load(self,previous=True):
@@ -209,7 +209,7 @@ class Workspace():
 
 	###---NAMING
 
-	def keyfinder(self,spotname=None):
+	def keyfinder(self,spot=None):
 
 		"""
 		Decorate the keys_to_filename lookup function so it can be sent to e.g. slice_trajectory.
@@ -217,7 +217,7 @@ class Workspace():
 		for all data in that spot.
 		"""
 
-		spotname = self.cursor if not spotname else spotname
+		spot = self.cursor if not spot else spot
 		def keys_to_filename(*args,**kwargs):
 
 			"""
@@ -226,15 +226,15 @@ class Workspace():
 			"""
 
 			strict = kwargs.get('strict',True)
-			if not spotname in self.toc: raise Exception('need a spotname to look up keys')
+			if not spot in self.toc: raise Exception('need a spotname to look up keys')
 			#---! it may be worth storing this as a function a la divy_keys
 			#---follow the top,step,part naming convention
 			try:
 				backwards = [''.join(['%s' if i[0]=='subpattern' else chr(i[1]) 
 					for i in re.sre_parse.parse(regex)]) 
-					for regex in [self.spots[spotname][key] for key in ['top','step','part']]]
+					for regex in [self.spots[spot][key] for key in ['top','step','part']]]
 				fn = os.path.join(
-					self.spots[spotname]['rootdir'],
+					self.spots[spot]['rootdir'],
 					'/'.join([backwards[ii]%i for ii,i in enumerate(args)]))
 			except Exception as e: 
 				tracer(e)
@@ -245,7 +245,7 @@ class Workspace():
 
 		return keys_to_filename
 
-	def divy_keys(self,spotname):
+	def divy_keys(self,spot):
 
 		"""
 		The treeparser matches trajectory files with a combined regex. 
@@ -254,7 +254,7 @@ class Workspace():
 		"""
 
 		group_counts = [sum([i[0]=='subpattern' 
-			for i in re.sre_parse.parse(self.spots[spotname][key])]) 
+			for i in re.sre_parse.parse(self.spots[spot][key])]) 
 			#---apply naming convention
 			for key in ['top','step','part']]
 		cursor = ([0]+[sum(group_counts[:i+1]) for i in range(len(group_counts))])
@@ -262,7 +262,21 @@ class Workspace():
 		divy = lambda x: [y[0] if len(y)==1 else y for y in [x[s] for s in slices]]
 		return divy
 
-	def prefixer(self,sn,spot=None):
+	def spotname_lookup(self,sn):
+
+		"""
+		Find the spotname for a particular simulation.
+		"""
+
+		assert type(sn)==str
+		spotnames = [key for key,val in self.toc.items() if sn in val]
+		spotnames_unique = list(set(zip(*spotnames)[0]))
+		if len(spotnames_unique) != 1: 
+			raise Exception('[ERROR] you cannot have the same simulation in multiple spots.\n'+
+				'simulation = "%s" and "%s"'%(sn,str(spotnames)))
+		return spotnames_unique[0]
+
+	def prefixer(self,sn):
 
 		"""
 		Choose a prefix for naming post-processing files.
@@ -271,25 +285,21 @@ class Workspace():
 		#---"spot" is a tuple of spotname and the part name
 		#---namer takes the spotname (called spot in the yaml defn of namer) and the simulation name
 		#---we include the partname when accessing self.spots
-		if spot: prefix = self.spots[spot]['namer'](spot[0],sn)
-		else: 
-			#---! the spotname is a tuple which must be converted to string to be sent to the namer as spot
-			#---! the following hack should be replaced once you figure out what to do with the suffixes
-			spotnamer = lambda spotname,suffix : '%s_%s'%(spotname,suffix) if suffix else spotname
-			prefix = self.spots[self.cursor]['namer'](spotnamer(*self.cursor),sn)
+		spot = spotname,partname = (work.spotname_lookup(sn),work.trajectory_format)
+		prefix = self.spots[spot]['namer'](spotname,sn)
 		return prefix
 		
 	###---DATASET PARSER
 
-	def treeparser(self,spotname):
+	def treeparser(self,spot):
 
 		"""
 		This function parses simulation data which are organized into a "spot". 
 		It writes the filenames to the table of contents (self.toc).
 		"""
 
-		spot = self.spots[spotname]
-		rootdir = spot['rootdir']
+		spot_sub = self.spots[spot]
+		rootdir = spot_sub['rootdir']
 		#---start with all files under rootdir
 		fns = [os.path.join(dirpath,fn) 
 			for (dirpath, dirnames, filenames) 
@@ -297,29 +307,29 @@ class Workspace():
 		#---regex combinator is the only place where we enforce a naming convention via top,step,part
 		#---note that we may wish to generalize this depending upon whether it is wise to have three parts
 		regex = ('^%s\/'%re.escape(rootdir.rstrip('/'))+
-			'\/'.join([spot['top'],spot['step'],spot['part']])
+			'\/'.join([spot_sub['top'],spot_sub['step'],spot_sub['part']])
 			+'$')
 		matches_raw = [i.groups() for fn in fns for i in [re.search(regex,fn)] if i]
 		if not matches_raw: 
-			status('no matches found for spot: "%s,%s"'%spotname,tag='warning')
+			status('no matches found for spot: "%s,%s"'%spot,tag='warning')
 			return
 		#---first we organize the top,step,part into tuples which serve as keys
 		#---we organize the toc as a doubly-nested dictionary of trajectory parts
 		#---the top two levels of the toc correspond to the top and step signifiers
 		#---note that this procedure projects the top,step,part naming convention into the toc
-		matches = [self.spots[spotname]['divy_keys'](i) for i in matches_raw]
-		self.toc[spotname] = collections.OrderedDict()
+		matches = [self.spots[spot]['divy_keys'](i) for i in matches_raw]
+		self.toc[spot] = collections.OrderedDict()
 		#---sort the tops into an ordered dictionary
 		for top in sorted(set(zip(*matches)[0])): 
-			self.toc[spotname][top] = collections.OrderedDict()
+			self.toc[spot][top] = collections.OrderedDict()
 		#---collect unique steps for each top and load them with the parts
-		for top in self.toc[spotname]:
+		for top in self.toc[spot]:
 			#---sort the steps into an ordered dictionary
 			for step in sorted(set([i[1] for i in matches if i[0]==top])):
 				#---we sort the parts into an ordered dictionary
 				#---this is the leaf of the toc tree and we use dictionaries
 				parts = sorted([i[2] for i in matches if i[0]==top and i[1]==step])
-				self.toc[spotname][top][step] = collections.OrderedDict([(part,{}) for part in parts])
+				self.toc[spot][top][step] = collections.OrderedDict([(part,{}) for part in parts])
 		#---now the toc is prepared with filenames but subsequent parsings will identify EDR files
 
 	def treeparser_edr(self):
@@ -329,17 +339,17 @@ class Workspace():
 		"""
 
 		#---perform this operation on any spotnames with a part named "edr"
-		spotnames_edr = [i for i in self.spots.keys() if i[1]=='edr']
+		spots_edr = [i for i in self.spots.keys() if i[1]=='edr']
 		#---prepare a list of edr files to parse first
 		targets = []
-		for spotname in spotnames_edr:
-			for sn in self.toc[spotname].keys():
-				steps = self.toc[spotname][sn].keys()
+		for spot in spots_edr:
+			for sn in self.toc[spot].keys():
+				steps = self.toc[spot][sn].keys()
 				for step in steps:
-					parts = self.toc[spotname][sn][step].keys()
+					parts = self.toc[spot][sn][step].keys()
 					for part in parts:
-						fn = self.keyfinder(spotname)(sn,step,part)
-						keys = (spotname,sn,step,part)
+						fn = self.keyfinder(spot)(sn,step,part)
+						keys = (spot,sn,step,part)
 						targets.append((fn,keys))
 		for ii,(fn,keys) in enumerate(targets):
 			status('scanning EDR files',i=ii,looplen=len(targets),tag='scan')
@@ -356,10 +366,10 @@ class Workspace():
 		"""
 
 		self.slice(sn)
-		spotname = kwargs.get('spotname',self.cursor)
-		#---! get the default spotname and get the edr part 
-		assert (spotname[0],'edr') in self.toc
-		edrtree = self.toc[(spotname[0],'edr')][sn]
+		spot = kwargs.get('spot',self.cursor)
+		#---! get the default spot and get the edr part 
+		assert (spot[0],'edr') in self.toc
+		edrtree = self.toc[(spot[0],'edr')][sn]
 		#---naming convention
 		sequence = [((sn,step,part),tuple([edrtree[step][part][key] 
 			for key in ['start','stop']]))
@@ -452,13 +462,13 @@ class Workspace():
 		"""
 
 		#---default spotname
-		spotname = kwargs.get('spotname',self.cursor)
+		self.cursor = kwargs.get('spot',self.cursor)
 		part_name = kwargs.get('part_name',self.cursor[1])
 		#---search for the simulation in all spots
 		keys_to_sn = [key for key in self.slices.keys() if key[1]==sn and key[0][1]==part_name]
 		if len(keys_to_sn)>1: raise Exception('found simulation %s in multiple spots!'%sn)
 		elif not keys_to_sn: 
-			raise Exception('failed to find key for sn "%s" and part "%s". '%(sn,part_name)+
+			raise Exception('failed to find slice key for sn "%s" and part "%s". '%(sn,part_name)+
 				'this might happen if you are missing that simulation or the "spot" that holds it. '+
 				'the cursor is "%s" and the spotname is "%s"'%(self.cursor,self.c))
 		unique_key = keys_to_sn[0]

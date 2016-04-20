@@ -1,0 +1,39 @@
+# PATHS for OMNICALC (note that this file is not tracked by git so you may wish to save a copy)
+
+# location of post-processing slices (note the user must make this directory manually!)
+post_data_spot: post
+# location of plots (note the user must make this directory manually!)
+post_plot_spot: plot
+# location of a pickle holding the state of the workspace
+workspace_spot: data/PROJECT_NAME/workspace 
+# write explicit clockfiles instead of storing them in the workspace (not a very consequential flag)
+timekeeper: false
+# import previous data or point omnicalc to new simulations, each of which is called a "spot"
+spots:
+  # colloquial name for the default "spot" for new simulations given as simulation_spot above
+  sims:
+    # name downstream postprocessing data according to the spot name (above) and simulation folder (top)
+    # note: that namer is set by default to take a simulation number and save "e.g. v1000.my_calc.dat"
+    # hint: if you have multiple spots then you *must* use spot in the namer or you violate uniqueness
+    namer: "lambda spot,top : 'v'+re.findall('simulation-v([0-9]+)',top)[0]"
+    # parent location of the spot_directory (may be changed if you mount the data elsewhere)
+    route_to_data: PARENT_DIRECTORY_FOR_MY_DATA
+    # path of the parent directory for the simulation data
+    # note: that omnicalc joins route_to_data and spot_directory only propagates this information via namer
+    # hint: this means that you can move the data but make sure namer doesn't lose track of the spot
+    spot_directory: DATA_DIRECTORY_IN_ROUTE_TO_DATA
+    # rules for parsing the data in the spot directories
+    regexes:
+      # each simulation folder in the spot directory must match the top regex
+      top: '(simulation-v[0-9]+)'
+      # each simulation folder must have trajectories in subfolders that match the step regex (can be null)
+      # note: you must enforce directory structure here with not-slash
+      step: '([stuv])([0-9]+)-([^\/]+)'
+      # each part regex is parsed by omnicalc
+      part: 
+        xtc: 'md\.part([0-9]{4})\.xtc'
+        trr: 'md\.part([0-9]{4})\.trr'
+        edr: 'md\.part([0-9]{4})\.edr'
+        tpr: 'md\.part([0-9]{4})\.tpr'
+        # specify a "structure" part for get_last_start_structure
+        structure: '(system|system-input|structure)\.(gro|pdb)'

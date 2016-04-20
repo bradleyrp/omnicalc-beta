@@ -46,6 +46,17 @@ def refresh(autoreload=True):
 	work = Workspace(workspace,autoreload=autoreload)
 	work.bootstrap()
 	work.save()
+
+def default_paths():
+
+	"""
+	Show the user a copy of paths.yaml.
+	"""
+
+	if not os.path.isfile('paths.yaml'):
+		raise Exception('[ERROR] found paths.yaml and refusing to overwrite with '+\
+			'the default, which you can find at omni/base/default_paths.yaml')
+	else: shutil.copyfile('omni/base/default_paths.yaml','paths.yaml')
 	
 def plot(plotname=None,nox=False,workspace=None,specfile=None,plotlog=False,**kwargs):
 
