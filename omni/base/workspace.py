@@ -285,7 +285,7 @@ class Workspace():
 		#---"spot" is a tuple of spotname and the part name
 		#---namer takes the spotname (called spot in the yaml defn of namer) and the simulation name
 		#---we include the partname when accessing self.spots
-		spot = spotname,partname = (work.spotname_lookup(sn),work.trajectory_format)
+		spot = spotname,partname = (self.spotname_lookup(sn),self.trajectory_format)
 		prefix = self.spots[spot]['namer'](spotname,sn)
 		return prefix
 		

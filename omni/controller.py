@@ -128,7 +128,7 @@ def export_to_factory(project_name,project_location,workspace=None):
 			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='trr']) or
 			any([sn in work.toc[i] for i in work.toc.keys() if i[1]=='xtc'])):
 			spot=(sns[sn],'edr')
-			name=work.prefixer(sn,spot=spot)
+			name=work.prefixer(sn)
 			try: models.Simulation(name=name,program="protein",code=sn).save()
 			except: print '[NOTE] simulation "%s" already exists in the database'%name
 	if not sns: print "[STATUS] nothing to export"
