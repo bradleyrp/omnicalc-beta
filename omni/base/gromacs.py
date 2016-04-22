@@ -127,14 +127,14 @@ def prepare_gmxpaths(machine_configuration,override=False,gmx_series=False):
 	return gmxpaths
 
 #---load machine configuration and gmxpaths into globals
-machine_configuration,this_machine = prepare_machine_configuration()
+machine_configuration,machine_name = prepare_machine_configuration()
 #---load environment modules from python to setup GROMACS if necessary/desired
 try:
 	#---modules in LOCAL configuration must be loaded before checking version
 	module_path = '/usr/share/Modules/default/init/python.py'
 	if 'modules' in machine_configuration:
 		import importlib
-		print '[STATUS] found modules in %s configuration'%this_machine
+		print '[STATUS] found modules in %s configuration'%machine_name
 		if 'module_path' in machine_configuration: module_path = machine_configuration['module_path']
 		execfile(module_path)
 		#try: execfile(module_path)
