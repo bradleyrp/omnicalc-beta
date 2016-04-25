@@ -23,6 +23,7 @@ gmx4paths = {
 	'genion':'genion',
 	'genconf':'genconf',
 	'trjconv':'trjconv',
+	'trjcat':'trjcat',
 	'tpbconv':'tpbconv',
 	'vmd':'vmd',
 	'gmxcheck':'gmxcheck',
