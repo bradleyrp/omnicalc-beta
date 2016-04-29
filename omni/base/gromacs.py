@@ -57,7 +57,7 @@ def prepare_machine_configuration(hostname=None):
 	config_raw = {}
 	#---look upwards if making docs so no tracebacks
 	prefix = '../../../' if re.match('.+\/docs\/build$',os.getcwd()) else ''
-	if os.path.isfile(prefix+'./config.py'): execfile(prefix+'./gromacs.py',config_raw)
+	if os.path.isfile(prefix+'./gromacs.py'): execfile(prefix+'./gromacs.py',config_raw)
 	else: execfile(os.environ['HOME']+'/.automacs.py',config_raw)
 	machine_configuration = config_raw['machine_configuration']
 
