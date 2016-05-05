@@ -497,7 +497,6 @@ class Workspace():
 		pbc_suffix = '' if not pbc else '.pbc%s'%pbc
 		outkey = '%s.%d-%d-%d.%s%s'%(self.prefixer(sn),start,end,skip,group,pbc_suffix)
 		grofile,trajfile = outkey+'.gro',outkey+'.'+self.trajectory_format
-		
 		#---make the slice only if necessary
 		both_there = all([os.path.isfile(self.postdir+fn) for fn in [grofile,trajfile]])
 		self.slice(sn,part_name=self.trajectory_format)
@@ -514,7 +513,7 @@ class Workspace():
 				slice_trajectory(start,end,skip,sequence,outkey,self.postdir,
 					tpr_keyfinder=self.keyfinder((self.c,'tpr')),
 					traj_keyfinder=self.keyfinder((self.c,self.trajectory_format)),
-					group_fn=self.groups[sn][group]['fn'])
+                                        group_fn=self.groups[sn][group]['fn'],pbc=pbc)
 			except KeyboardInterrupt: raise Exception('[ERROR] cancelled by user')
 			except Exception as e:
 				#---the following exception handler allows the code to continue to slice in case
