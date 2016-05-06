@@ -4,8 +4,9 @@ import sys,os,re,time,glob
 import yaml
 import pickle,json,copy,glob,signal,collections
 from base.tools import unpacker,path_expand,status,argsort,unescape,tupleflat
-from base.tools import delve,asciitree,catalog,status,unique,flatten,tracer
+from base.tools import delve,asciitree,catalog,status,unique,flatten,tracer,call
 from base.gromacs_interface import gmxread,mdasel,edrcheck,slice_trajectory,machine_name
+from base.gromacs import gmxpaths
 from base.hypothesis import hypothesis
 from base.computer import computer
 from base.timer import checktime
@@ -383,7 +384,7 @@ class Workspace():
 		#	if not strict or (None not in self.edr_times[self.xtc_files.index(fn)])]
 		#return seq_time_fn
 
-	def get_last_start_structure(self,sn,partname='structure'):
+	def get_last_start_structure(self,sn,part_name='structure'):
 	
 		"""
 		A function which identifies an original structure for reference.
@@ -392,7 +393,24 @@ class Workspace():
 		"""
 		
 		#---call slice to move the cursor
-		self.slice(sn,part_name=partname)
+		keys_to_sn = [key for key in self.slices.keys() if key[1]==sn and key[0][1]==part_name]
+                if keys_to_sn==[]:
+                        last_tpr=self.get_last_start_structure(sn,part_name='tpr')
+                        last_traj=self.get_last_start_structure(sn,part_name=self.trajectory_format)
+                        #! This may not get the right start time for the xtc to do the dump
+                        dump_time=int(self.get_timeseries(sn)[0][-1][0])
+                        cwd=os.path.dirname(last_tpr)
+                        if not os.path.isfile(os.path.join(cwd,'system.gro')):
+                                tail = ' -dump %d -s %s -f %s -o system.gro'%(dump_time,last_tpr,last_traj)
+                                call(gmxpaths['trjconv']+tail,cwd=cwd,inpipe='0\n',logfile='log-trjconv-system-make_gro')
+                        #---add the newly-created system.gro to the toc even if it doesn't use the structure regex
+                        if sn not in self.toc[(self.c,part_name)]: self.toc[(self.c,part_name)][sn] = collections.OrderedDict()
+                        step = self.toc[(self.c,'tpr')][sn].items()[-1][0]
+                        self.toc[(self.c,part_name)][sn][step] = collections.OrderedDict()
+                        self.toc[(self.c,part_name)][sn][step][('system','gro')] = {}
+                        
+		#self.slice(sn,part_name=part_name)
+                self.cursor = (self.c,part_name)
 		step,structures = self.toc[self.cursor][sn].items()[-1]
 		#---since structures should be equivalent we take the first
 		structure = structures.keys()[0]
