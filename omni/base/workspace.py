@@ -101,6 +101,7 @@ class Workspace():
 		self.c = self.cursor[0]
 		#---! default to XTC
 		self.trajectory_format = 'xtc'
+		self.merge_method = self.paths.get('merge_method','careful')
 		
 		#---open self if the filename exists 
 		#---note that we save parser results but not details from paths.yaml in case these change
@@ -582,7 +583,7 @@ class Workspace():
 			
 	###---INTERPRET SPECIFICATIONS
 
-	def load_specs(self,merge_method='careful'):
+	def load_specs(self,merge_method=None):
 
 		"""
 		A central place where we read all specs files.
@@ -595,8 +596,14 @@ class Workspace():
 		import copy
 		specs_files = glob.glob('./calcs/specs/meta*yaml')
 		allspecs = []
+		merge_method = self.merge_method if not merge_method else merge_method
 		for fn in specs_files:
-			with open(fn) as fp: allspecs.append(yaml.load(fp.read()))
+			with open(fn) as fp: 
+				if (merge_method != 'override_factory' or 
+					not re.match('^meta\.factory\.',os.path.basename(fn))):
+					allspecs.append(yaml.load(fp.read()))
+		#---if we are overriding factory then we change to careful after filtering out the factory
+		merge_method = 'careful' if merge_method=='override_factory' else merge_method
 		if merge_method=='strict':
 			specs = allspecs.pop(0)
 			for spec in allspecs:

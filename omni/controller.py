@@ -133,7 +133,7 @@ def export_to_factory(project_name,project_location,workspace=None):
 			except: print '[NOTE] simulation "%s" already exists in the database'%name
 	if not sns: print "[STATUS] nothing to export"
 
-def pipeline(script,nox=False):
+def pipeline(script=None,nox=False):
 
 	"""
 	DEVELOPMENT
@@ -141,6 +141,13 @@ def pipeline(script,nox=False):
 	Initially developed for making movies.
 	"""
 
+	if not script:
+		pipeline_regex = '^pipeline-(.+)\.py$'
+		print "[USAGE] make pipeline <name>"
+		print "[USAGE] available pipelines: \n > "+'\n > '.join([re.findall(pipeline_regex,i)[0] 
+			for i in [os.path.basename(j) for j in glob.glob("./calcs/pipeline-*.py")]
+			if re.match(pipeline_regex,i)])
+		return
 	#---drop into the pipeline code but load the header first
 	script_fn = "./calcs/pipeline-%s.py"%script
 	print "[STATUS] starting pipeline via %s"%script_fn

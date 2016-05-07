@@ -134,10 +134,11 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 					if 'filekey' not in sl:
 						#---! pbc and groups will usually be absent here
 						start,end,skip,pbc = [sl[i] for i in 'start,end,skip,pbc'.split(',')]
-						sl['filekey'] = '%s%s.%d-%d-%d'%('v',work.shortname(sn),start,end,skip)
+						sl['filekey'] = '%s.%d-%d-%d'%(work.prefixer(sn),start,end,skip)
 				else: raise Exception('[ERROR] cannot infer slices')
 				#---compute base filename
 				if not group: 
+					#---! deprecated
 					fn_base = re.findall('^v[0-9]+\.[0-9]+-[0-9]+-[0-9]+',sl['filekey'])[0]+'.%s'%calcname
 				elif use_group:
 					#---special settings here for loading certain kinds of data eg protein_abstractor
