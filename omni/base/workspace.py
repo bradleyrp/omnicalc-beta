@@ -13,6 +13,7 @@ from base.timer import checktime
 from base.store import picturefind,store,load
 from copy import deepcopy
 import MDAnalysis
+import numpy as np
 
 conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
 
@@ -637,7 +638,9 @@ class Workspace():
 					else: 
 						for key,val in topval.items():
 							if key not in specs[topkey]: specs[topkey][key] = val
-							else: raise Exception(
+							else: 
+								import pdb;pdb.set_trace()
+								raise Exception(
 								('[ERROR] performing careful merge in the top-level specs dictionary "%s" '+
 								' but there is already a child key "%s"')%(topkey,key))
 		else: raise Exception('\n[ERROR] unclear meta specs merge method %s'%merge_method)
@@ -737,6 +740,7 @@ class Workspace():
 			for key in extra_keys: del chop[key]
 			if calc['specs']==chop: return specfn
 		if debug: 
+			print '[ERROR] failed to find postdata ...'
 			import pdb;pdb.set_trace() #---legit
 		return None
 
@@ -747,9 +751,9 @@ class Workspace():
 		"""
 	
 		if type(calc['slice_name'])==str:
-			return self.slices[sn][calc['slice_name']]['all' if not group else group]['timeseries']
+			return self.slice(sn)[calc['slice_name']]['all' if not group else group]['timeseries']
 		else: 
-			return concatenate([self.slices[sn][sname]['all' if not group else group]['timeseries']
+			return np.concatenate([self.slice(sn)[sname]['all' if not group else group]['timeseries']
 				for sname in calc['slice_name']])
 
 	def get_post(self,sn,calcname=None,plotname=None,lookup=None):
