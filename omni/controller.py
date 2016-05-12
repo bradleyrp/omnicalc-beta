@@ -7,6 +7,7 @@ from base.store import load
 from base.tools import unpacker,delve,status,call
 
 conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
+if not os.path.isfile(conf_gromacs): shutil.copyfile('omni/base/default_config.py','./'+conf_gromacs)
 
 #---FUNCTIONS
 #-------------------------------------------------------------------------------------------------------------
