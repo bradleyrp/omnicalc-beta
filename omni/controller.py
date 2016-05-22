@@ -133,7 +133,7 @@ def export_to_factory(project_name,project_location,workspace=None):
 			except: print '[NOTE] simulation "%s" already exists in the database'%name
 	if not sns: print "[STATUS] nothing to export"
 
-def pipeline(script=None,nox=False):
+def pipeline(*flags,**kwargs):
 
 	"""
 	DEVELOPMENT
@@ -141,6 +141,11 @@ def pipeline(script=None,nox=False):
 	Initially developed for making movies.
 	"""
 
+	flags = list(flags)
+	#---script and quit are protected and get popped
+	script = kwargs.pop('script',None)
+	quit = kwargs.pop('quit',None)
+	if not script and len(flags)>0: script = flags.pop(0)
 	if not script:
 		pipeline_regex = '^pipeline-(.+)\.py$'
 		print "[USAGE] make pipeline <name>"
@@ -152,8 +157,12 @@ def pipeline(script=None,nox=False):
 	script_fn = "./calcs/pipeline-%s.py"%script
 	print "[STATUS] starting pipeline via %s"%script_fn
 	if not os.path.isfile(script_fn): raise Exception("[ERROR] cannot find "+script_fn)
-	extra_args = "" if not nox else "import os,sys;sys.argv.append(\"nox\");"
-	os.system('python -i -c \'%sexecfile("./omni/base/header.py");execfile("%s")\''%(extra_args,script_fn))
+	#---all flags and arguments pass through
+	extra_args = "import os,sys;"
+	for flag in flags: extra_args += 'sys.argv.append(\"%s\");'%flag
+	for key,val in kwargs.items(): extra_args += 'sys.argv.append(\"%s=%s\");'%(key,val)
+	os.system('python %s -c \'%sexecfile("./omni/base/header.py");execfile("%s")\''%(
+		'-i' if not quit else '',extra_args,script_fn))
 
 def docs(clean=False):
 

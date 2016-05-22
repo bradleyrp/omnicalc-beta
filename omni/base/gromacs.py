@@ -38,6 +38,7 @@ gmx5paths = {
 	'make_ndx':'gmx make_ndx',
 	'genion':'gmx genion',
 	'trjconv':'gmx trjconv',
+	'trjcat':'gmx trjcat',
 	'genconf':'gmx genconf',
 	'tpbconv':'gmx convert-tpr',
 	'gmxcheck':'gmx check',
