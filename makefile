@@ -3,6 +3,7 @@
 #-------------------------------------------------------------------------------------------------------------
 
 #---always show the banner
+-include banner
 banner:
 	@echo -n "[STATUS] banner: "
 	@sed -n 1,7p omni/readme.md

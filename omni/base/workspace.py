@@ -4,14 +4,16 @@ import sys,os,re,time,glob
 import yaml
 import pickle,json,copy,glob,signal,collections
 from base.tools import unpacker,path_expand,status,argsort,unescape,tupleflat
-from base.tools import delve,asciitree,catalog,status,unique,flatten,tracer
+from base.tools import delve,asciitree,catalog,status,unique,flatten,tracer,call
 from base.gromacs_interface import gmxread,mdasel,edrcheck,slice_trajectory,machine_name
+from base.gromacs import gmxpaths
 from base.hypothesis import hypothesis
 from base.computer import computer
 from base.timer import checktime
 from base.store import picturefind,store,load
 from copy import deepcopy
 import MDAnalysis
+import numpy as np
 
 conf_paths,conf_gromacs = "paths.yaml","gromacs.py"
 
@@ -101,6 +103,7 @@ class Workspace():
 		self.c = self.cursor[0]
 		#---! default to XTC
 		self.trajectory_format = 'xtc'
+		self.merge_method = self.paths.get('merge_method','careful')
 		
 		#---open self if the filename exists 
 		#---note that we save parser results but not details from paths.yaml in case these change
@@ -384,7 +387,7 @@ class Workspace():
 		#	if not strict or (None not in self.edr_times[self.xtc_files.index(fn)])]
 		#return seq_time_fn
 
-	def get_last_start_structure(self,sn,partname='structure'):
+	def get_last_start_structure(self,sn,part_name='structure'):
 	
 		"""
 		A function which identifies an original structure for reference.
@@ -393,7 +396,24 @@ class Workspace():
 		"""
 		
 		#---call slice to move the cursor
-		self.slice(sn,part_name=partname)
+		keys_to_sn = [key for key in self.slices.keys() if key[1]==sn and key[0][1]==part_name]
+                if keys_to_sn==[]:
+                        last_tpr=self.get_last_start_structure(sn,part_name='tpr')
+                        last_traj=self.get_last_start_structure(sn,part_name=self.trajectory_format)
+                        #! This may not get the right start time for the xtc to do the dump
+                        dump_time=int(self.get_timeseries(sn)[0][-1][0])
+                        cwd=os.path.dirname(last_tpr)
+                        if not os.path.isfile(os.path.join(cwd,'system.gro')):
+                                tail = ' -dump %d -s %s -f %s -o system.gro'%(dump_time,last_tpr,last_traj)
+                                call(gmxpaths['trjconv']+tail,cwd=cwd,inpipe='0\n',logfile='log-trjconv-system-make_gro')
+                        #---add the newly-created system.gro to the toc even if it doesn't use the structure regex
+                        if sn not in self.toc[(self.c,part_name)]: self.toc[(self.c,part_name)][sn] = collections.OrderedDict()
+                        step = self.toc[(self.c,'tpr')][sn].items()[-1][0]
+                        self.toc[(self.c,part_name)][sn][step] = collections.OrderedDict()
+                        self.toc[(self.c,part_name)][sn][step][('system','gro')] = {}
+                        
+		#self.slice(sn,part_name=part_name)
+                self.cursor = (self.c,part_name)
 		step,structures = self.toc[self.cursor][sn].items()[-1]
 		#---since structures should be equivalent we take the first
 		structure = structures.keys()[0]
@@ -498,7 +518,6 @@ class Workspace():
 		pbc_suffix = '' if not pbc else '.pbc%s'%pbc
 		outkey = '%s.%d-%d-%d.%s%s'%(self.prefixer(sn),start,end,skip,group,pbc_suffix)
 		grofile,trajfile = outkey+'.gro',outkey+'.'+self.trajectory_format
-		
 		#---make the slice only if necessary
 		both_there = all([os.path.isfile(self.postdir+fn) for fn in [grofile,trajfile]])
 		self.slice(sn,part_name=self.trajectory_format)
@@ -515,7 +534,7 @@ class Workspace():
 				slice_trajectory(start,end,skip,sequence,outkey,self.postdir,
 					tpr_keyfinder=self.keyfinder((self.c,'tpr')),
 					traj_keyfinder=self.keyfinder((self.c,self.trajectory_format)),
-					group_fn=self.groups[sn][group]['fn'])
+                                        group_fn=self.groups[sn][group]['fn'],pbc=pbc)
 			except KeyboardInterrupt: raise Exception('[ERROR] cancelled by user')
 			except Exception as e:
 				#---the following exception handler allows the code to continue to slice in case
@@ -583,7 +602,7 @@ class Workspace():
 			
 	###---INTERPRET SPECIFICATIONS
 
-	def load_specs(self,merge_method='careful'):
+	def load_specs(self,merge_method=None):
 
 		"""
 		A central place where we read all specs files.
@@ -596,8 +615,14 @@ class Workspace():
 		import copy
 		specs_files = glob.glob('./calcs/specs/meta*yaml')
 		allspecs = []
+		merge_method = self.merge_method if not merge_method else merge_method
 		for fn in specs_files:
-			with open(fn) as fp: allspecs.append(yaml.load(fp.read()))
+			with open(fn) as fp: 
+				if (merge_method != 'override_factory' or 
+					not re.match('^meta\.factory\.',os.path.basename(fn))):
+					allspecs.append(yaml.load(fp.read()))
+		#---if we are overriding factory then we change to careful after filtering out the factory
+		merge_method = 'careful' if merge_method=='override_factory' else merge_method
 		if merge_method=='strict':
 			specs = allspecs.pop(0)
 			for spec in allspecs:
@@ -614,7 +639,9 @@ class Workspace():
 					else: 
 						for key,val in topval.items():
 							if key not in specs[topkey]: specs[topkey][key] = val
-							else: raise Exception(
+							else: 
+								import pdb;pdb.set_trace()
+								raise Exception(
 								('[ERROR] performing careful merge in the top-level specs dictionary "%s" '+
 								' but there is already a child key "%s"')%(topkey,key))
 		else: raise Exception('\n[ERROR] unclear meta specs merge method %s'%merge_method)
@@ -714,6 +741,7 @@ class Workspace():
 			for key in extra_keys: del chop[key]
 			if calc['specs']==chop: return specfn
 		if debug: 
+			print '[ERROR] failed to find postdata ...'
 			import pdb;pdb.set_trace() #---legit
 		return None
 
@@ -724,9 +752,9 @@ class Workspace():
 		"""
 	
 		if type(calc['slice_name'])==str:
-			return self.slices[sn][calc['slice_name']]['all' if not group else group]['timeseries']
+			return self.slice(sn)[calc['slice_name']]['all' if not group else group]['timeseries']
 		else: 
-			return concatenate([self.slices[sn][sname]['all' if not group else group]['timeseries']
+			return np.concatenate([self.slice(sn)[sname]['all' if not group else group]['timeseries']
 				for sname in calc['slice_name']])
 
 	def get_post(self,sn,calcname=None,plotname=None,lookup=None):
