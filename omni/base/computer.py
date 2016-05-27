@@ -127,7 +127,7 @@ def computer(function,**kwargs):
 			end = max([work.slice(sn)[s]['all' if not group else group]['end'] for s in slice_name])
 			skip = work.slice(sn)[s]['all' if not group else group]['skip']
 			#---! this filekey construction means the user will have to anticipate the names of combos
-			fn_base = 'v%s.%d-%d-%d.%s'%(work.shortname(sn),start,end,skip,function.__name__)
+			fn_base = '%s.%d-%d-%d.%s'%(work.prefixer(sn),start,end,skip,function.__name__)
 		else:
 			#---we index all calculations automatically in case we loop over specs later
 			index,fn_key = -1,''

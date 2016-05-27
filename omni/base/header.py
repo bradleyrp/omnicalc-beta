@@ -73,3 +73,37 @@ def doneplot():
 
 	if 'kwargs' in globals() and 'quit' in globals()['kwargs'] and globals()['kwargs']['quit']:
 		os._exit(1)
+
+#---DEVTRICKS
+#-------------------------------------------------------------------------------------------------------------
+
+if False:
+
+	import readline,traceback
+
+	class again:
+		@staticmethod
+		def localfunction(*args):
+			ns = globals()['next_script']
+			print "[GOTO] running %s"%ns
+			execfile(ns,globals())
+			#import pdb;pdb.set_trace()
+			if args: print '[TRICK] ignoring %s'%repr(args)
+
+	def displayhook(whatever):
+		if hasattr(whatever,'localfunction'): return whatever.localfunction()
+		else: print whatever
+
+	def excepthook(exctype, value, tb):
+		if exctype is SyntaxError:
+			index = readline.get_current_history_length()
+			item = readline.get_history_item(index)
+			command = item.split()
+			print 'command:', command
+			if len(command[0]) == 1:
+				try: eval(command[0]).localfunction(*command[1:])
+				except: traceback.print_exception(exctype, value, tb)
+		else: traceback.print_exception(exctype, value, tb)
+
+	sys.displayhook = displayhook
+	sys.excepthook = excepthook

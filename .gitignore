@@ -1,7 +1,7 @@
 /*
 /*/
-!paths.yaml
-!gromacs.py
+paths.yaml
+gromacs.py
 !/omni/
 !/calcs/
 !/calcs/codes/
