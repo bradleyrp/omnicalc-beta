@@ -270,6 +270,7 @@ class Workspace():
 
 		assert type(sn)==str
 		spotnames = [key for key,val in self.toc.items() if sn in val]
+		if not spotnames: raise Exception('[ERROR] could not find simulation "%s" in the toc'%sn)
 		spotnames_unique = list(set(zip(*spotnames)[0]))
 		if len(spotnames_unique) != 1: 
 			raise Exception('[ERROR] you cannot have the same simulation in multiple spots.\n'+
