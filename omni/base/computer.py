@@ -6,6 +6,25 @@ import os,glob,re,json
 from copy import deepcopy
 import yaml
 
+computer_error_attrs_passthrough = """
+[ERROR] the calculation has a number of "specs" according 
+[ERROR] to one of your meta files. after the data are saved,
+[ERROR] the plotloader function will use these specs to 
+[ERROR] uniquely identify the upstream data from this 
+[ERROR] calculation. however, all of the attributes must 
+[ERROR] "pass through" the calculation function and end up 
+[ERROR] in the attrs section. it looks like you failed to 
+[ERROR] pass one of them through, but I couldn't tell until 
+[ERROR] after the calculation was complete and we are ready 
+[ERROR] to write the data. you can procede by removing the 
+[ERROR] attribute from your calculation specs in the meta 
+[ERROR] file or by adding it to the outgoing data via e.g. 
+[ERROR] "attrs['my_spec'] = my_spec". recall also that the 
+[ERROR] attribute/spec comes *in* to the calculation function 
+[ERROR] in "kwargs['calc']['specs']". the incoming warning
+[ERROR] will tell you which attributes are causing the problem
+"""
+
 def computer(function,**kwargs):
 
 	"""
@@ -162,11 +181,9 @@ def computer(function,**kwargs):
 				unaccounted.remove('upstream')
 				attrs['upstream'] = calc['specs']['upstream']
 			if any(unaccounted):
+				print computer_error_attrs_passthrough+'\n\n'
 				status('some calculation specs were not saved: %s'%
-					str(unaccounted),tag='warning')
-				print '[ERROR] a calculation spec was not added to the attributes and '+\
-					'hence these data will not be found by plotloader later on. '+\
-					'Add the specs to attrs in your calculation function to continue.'
+					str(unaccounted),tag='STATUS')
 				import pdb;pdb.set_trace()
 			store(result,fn,work.postdir,attrs=attrs)
 			with open(work.postdir+fn_base+fn_key+'.spec','w') as fp: fp.write(json.dumps(attrs)+'\n')

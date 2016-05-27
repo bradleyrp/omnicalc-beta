@@ -157,7 +157,9 @@ def plotload(plotname,work,specfile=None,choice_override=None,use_group=False):
 				#---get the dat file and package it
 				fn = work.select_postdata(fn_base,calc,debug=True)
 				if fn == None: 
-					print '[ERROR] cannot locate a file necessary for plotting'
+					print '[ERROR] cannot locate a file necessary for plotting via work.select_postdata\n'+\
+						'[ERROR] you probably need to fix your meta.yaml file and run "make compute"\n'+\
+						'[ERROR] check the post directory at "%s" and the variables fn_base,calc\n'
 					import pdb;pdb.set_trace()
 				dat_fn = os.path.basename(fn)[:-4]+'dat'
 				data[calcnum][sn] = {'data':load(dat_fn,work.postdir),

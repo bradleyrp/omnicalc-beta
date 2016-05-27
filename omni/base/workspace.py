@@ -285,8 +285,10 @@ class Workspace():
 		#---"spot" is a tuple of spotname and the part name
 		#---namer takes the spotname (called spot in the yaml defn of namer) and the simulation name
 		#---we include the partname when accessing self.spots
-		spot = spotname,partname = (self.spotname_lookup(sn),self.trajectory_format)
-		prefix = self.spots[spot]['namer'](spotname,sn)
+		try: 
+			spot = spotname,partname = (self.spotname_lookup(sn),self.trajectory_format)
+			prefix = self.spots[spot]['namer'](spotname,sn)
+		except: raise Exception('[ERROR] prefixer failure on simulation "%s" (check your namer)'%sn)
 		return prefix
 		
 	###---DATASET PARSER
