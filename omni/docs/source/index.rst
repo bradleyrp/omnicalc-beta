@@ -17,10 +17,11 @@ Contents
   :numbered:
 
   paths
+  metadata
+  slices
 
 .. note :: 
 
-  slices
   calculations
   controller
   pipeline
