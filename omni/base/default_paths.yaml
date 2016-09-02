@@ -5,7 +5,7 @@ post_data_spot: post
 # location of plots (note the user must make this directory manually!)
 post_plot_spot: plot
 # location of a pickle holding the state of the workspace
-workspace_spot: data/PROJECT_NAME/workspace 
+workspace_spot: workspace 
 # write explicit clockfiles instead of storing them in the workspace (not a very consequential flag)
 timekeeper: false
 # import previous data or point omnicalc to new simulations, each of which is called a "spot"
