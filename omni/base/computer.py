@@ -37,7 +37,10 @@ def computer(function,**kwargs):
 				raise Exception(
 					'\n[ERROR] the slices yaml file is missing a slice named "%s" for simulation "%s"'%
 					(slice_name,sn))
-			mfp = work.slice(sn)[slice_name][group]['missing_frame_percent']
+			try: mfp = work.slice(sn)[slice_name][group]['missing_frame_percent']
+			except: 
+				print "[WARNING] no missing frame percentage here"
+				mfp = 0.0
 			if mfp>work.missing_frame_tolerance:
 				status('upstream slice failure: %s,%s,%s missing_frame_percent=%.1f'%(
 					sn,slice_name,group,mfp),tag='warning')

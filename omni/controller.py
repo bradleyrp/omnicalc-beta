@@ -244,4 +244,4 @@ if __name__ == "__main__":
 	#---if the function is not above check scripts
 	if sys.argv[1] not in globals(): 
 		for fn in glob.glob('./calcs/scripts/*.py'): execfile(fn)
-	else: makeface(*sys.argv[1:])
+	makeface(*sys.argv[1:])

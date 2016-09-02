@@ -900,6 +900,9 @@ class Workspace():
 			depends = {t[0]:[t[ii+1] for ii,i in enumerate(t) if ii<len(t)-1 and t[ii]=='upstream'] 
 				for t in upstream_catalog}
 			calckeys = [i for i in self.calc if i not in depends]
+			#---check that the calckeys has enough elements 
+			list(set(calckeys+[i for j in depends.values() for i in j]))			
+			#---! come back to this!
 			while any(depends):
 				ii,i = depends.popitem()
 				if all([j in calckeys for j in i]) and i!=[]: calckeys.append(ii)
