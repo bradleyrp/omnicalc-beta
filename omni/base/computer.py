@@ -64,9 +64,12 @@ def computer(function,**kwargs):
 				status('upstream slice failure: %s,%s,%s missing_frame_percent=%.1f'%(
 					sn,slice_name,group,mfp),tag='warning')
 				continue
-			new_job['grofile'] = work.postdir+work.slice(sn)[slice_name][group]['gro']
+			#---defaulting to 'all' group if group is None
+			new_job['grofile'] = work.postdir+\
+				work.slice(sn)[slice_name][group if group else 'all']['gro']
 			#---! xtc must become a flag. recommend 'xtc' becomes work.cursor[1]
-			new_job['trajfile'] = work.postdir+work.slice(sn)[slice_name][group]['xtc']
+			#---defaulting to 'all' group if group is None
+			new_job['trajfile'] = work.postdir+work.slice(sn)[slice_name][group if group else 'all']['xtc']
 		if 'specs' not in calc: calc['specs'] = ''
 		if 'upstream' in calc['specs']:
 			#---if no loop on upstream you can use a list
@@ -155,6 +158,7 @@ def computer(function,**kwargs):
 		#---check for specs file with the exact same specifications
 		exists = True if index != -1 and work.select_postdata(fn_base,calc) != None else False
 		if not exists:
+			import ipdb;ipdb.set_trace()
 			status("%s %s"%(function.__name__,str(outgoing)),tag='compute')
 			outgoing['workspace'] = work
 			outgoing['calc'] = calc
