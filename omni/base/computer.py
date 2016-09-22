@@ -64,7 +64,9 @@ def computer(function,**kwargs):
 				status('upstream slice failure: %s,%s,%s missing_frame_percent=%.1f'%(
 					sn,slice_name,group,mfp),tag='warning')
 				continue
-			new_job['grofile'] = work.postdir+work.slice(sn)[slice_name][group]['gro']
+			try: new_job['grofile'] = work.postdir+work.slice(sn)[slice_name][group]['gro']
+			except:
+				import pdb;pdb.set_trace()
 			#---! xtc must become a flag. recommend 'xtc' becomes work.cursor[1]
 			new_job['trajfile'] = work.postdir+work.slice(sn)[slice_name][group]['xtc']
 		if 'specs' not in calc: calc['specs'] = ''
